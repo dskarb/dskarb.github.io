@@ -1,0 +1,89 @@
+<section class="module" id="m18" data-num="18" data-title="Glosariusz i ściąga">
+<div class="module-head"><div class="kicker">Moduł 18 · Ściąga</div><h1>Glosariusz i ściąga decyzyjna</h1>
+<p>Wszystkie kluczowe pojęcia w jednym miejscu i szybkie odpowiedzi na najczęstsze decyzje projektowe.</p></div>
+
+<h2>Ściąga decyzyjna</h2>
+<div class="table-wrap"><table>
+<tr><th>Sytuacja</th><th>Pierwszy wybór</th></tr>
+<tr><td>Model musi znać prywatne / aktualne dane</td><td>RAG lub narzędzia (nie fine-tuning)</td></tr>
+<tr><td>Wiedza mieści się w ~50–100k tokenów i rzadko się zmienia</td><td>Cały kontekst + prompt caching</td></tr>
+<tr><td>Potrzebny JSON</td><td>Structured output / wymuszone narzędzie + walidacja Zod</td></tr>
+<tr><td>Wyszukiwanie kodów, nazw, numerów</td><td>Hybrid search (BM25 + wektory)</td></tr>
+<tr><td>Za dużo słabych fragmentów w kontekście</td><td>Reranker, mniejsze k na wyjściu</td></tr>
+<tr><td>Znana sekwencja kroków</td><td>Workflow w kodzie, nie agent</td></tr>
+<tr><td>Akcja nieodwracalna wykonywana przez model</td><td>Zatwierdzenie przez człowieka</td></tr>
+<tr><td>Za wysoki koszt</td><td>Mniejszy model + routing, caching, krótszy output, batch</td></tr>
+<tr><td>Za wysoka latencja</td><td>Streaming, mniejszy model, krótszy output, mniej kroków agenta, równoległość</td></tr>
+<tr><td>Niespójny format / styl mimo dobrego promptu</td><td>Więcej przykładów → fine-tuning</td></tr>
+<tr><td>Dane nie mogą opuścić firmy</td><td>Model open-weight self-hosted (vLLM) lub chmura z umową i regionem</td></tr>
+<tr><td>Zmiana promptu / modelu</td><td>Evale per kategoria → stopniowy rollout</td></tr>
+<tr><td>Wektory na start, mało ops</td><td>Postgres + pgvector</td></tr>
+<tr><td>Integracja narzędzi z wieloma aplikacjami AI</td><td>Serwer MCP</td></tr>
+</table></div>
+
+<h2>Glosariusz</h2>
+<div class="table-wrap"><table>
+<tr><th>Pojęcie</th><th>Znaczenie</th></tr>
+<tr><td><b>Agent</b></td><td>LLM działający w pętli z narzędziami, sam decydujący o kolejnych krokach.</td></tr>
+<tr><td><b>ANN</b></td><td>Approximate Nearest Neighbor — przybliżone szukanie najbliższych wektorów (HNSW, IVF).</td></tr>
+<tr><td><b>Attention</b></td><td>Mechanizm transformera, w którym każdy token waży istotność pozostałych tokenów.</td></tr>
+<tr><td><b>Autoregresja</b></td><td>Generowanie token po tokenie, każdy nowy token dołączany do wejścia.</td></tr>
+<tr><td><b>Batch API</b></td><td>Asynchroniczne przetwarzanie paczek żądań, taniej, wynik w ciągu godzin.</td></tr>
+<tr><td><b>BM25</b></td><td>Klasyczny algorytm rankingu wyszukiwania pełnotekstowego oparty na słowach.</td></tr>
+<tr><td><b>BPE</b></td><td>Byte Pair Encoding — algorytm tworzenia słownika tokenów z częstych sekwencji.</td></tr>
+<tr><td><b>Chain-of-thought</b></td><td>Rozumowanie krok po kroku przed odpowiedzią.</td></tr>
+<tr><td><b>Chunk / chunking</b></td><td>Fragment dokumentu i proces dzielenia dokumentów na fragmenty do RAG.</td></tr>
+<tr><td><b>Context engineering</b></td><td>Projektowanie całej zawartości okna kontekstowego: instrukcji, narzędzi, danych, historii.</td></tr>
+<tr><td><b>Context window</b></td><td>Maksymalna liczba tokenów (wejście + wyjście) w jednym wywołaniu.</td></tr>
+<tr><td><b>Contextual retrieval</b></td><td>Dopisywanie kontekstu dokumentu do chunka przed embeddingiem.</td></tr>
+<tr><td><b>Cosine similarity</b></td><td>Miara podobieństwa kierunku dwóch wektorów (−1…1).</td></tr>
+<tr><td><b>Cross-encoder</b></td><td>Model oceniający parę (zapytanie, dokument) razem — używany jako reranker.</td></tr>
+<tr><td><b>Destylacja</b></td><td>Trenowanie małego modelu na odpowiedziach dużego.</td></tr>
+<tr><td><b>DPO</b></td><td>Direct Preference Optimization — dostrajanie na parach odpowiedzi lepsza/gorsza.</td></tr>
+<tr><td><b>Embedding</b></td><td>Wektor liczb reprezentujący znaczenie tekstu, obrazu lub innego obiektu.</td></tr>
+<tr><td><b>Eval</b></td><td>Zestaw przypadków testowych i sposób oceny jakości systemu AI.</td></tr>
+<tr><td><b>Faithfulness</b></td><td>Stopień, w jakim odpowiedź wynika wyłącznie ze źródeł (brak halucynacji).</td></tr>
+<tr><td><b>Few-shot</b></td><td>Prompt z kilkoma przykładami wejście→wyjście.</td></tr>
+<tr><td><b>Fine-tuning</b></td><td>Dalszy trening modelu na własnych danych w celu zmiany zachowania.</td></tr>
+<tr><td><b>GGUF</b></td><td>Format plików modeli dla llama.cpp/Ollamy, zwykle skwantyzowanych.</td></tr>
+<tr><td><b>Guardrails</b></td><td>Kontrole wejścia i wyjścia modelu (moderacja, walidacja, filtry).</td></tr>
+<tr><td><b>Halucynacja</b></td><td>Wiarygodnie brzmiąca, ale fałszywa odpowiedź modelu.</td></tr>
+<tr><td><b>HNSW</b></td><td>Hierarchical Navigable Small World — grafowy indeks ANN.</td></tr>
+<tr><td><b>Hybrid search</b></td><td>Połączenie wyszukiwania leksykalnego i wektorowego.</td></tr>
+<tr><td><b>HyDE</b></td><td>Wyszukiwanie po embeddingu hipotetycznej odpowiedzi wygenerowanej przez model.</td></tr>
+<tr><td><b>Knowledge cutoff</b></td><td>Data, do której sięgają dane treningowe modelu.</td></tr>
+<tr><td><b>KV cache</b></td><td>Pamięć obliczonych kluczy/wartości attention, przyspiesza generowanie kolejnych tokenów.</td></tr>
+<tr><td><b>LLM-as-judge</b></td><td>Użycie modelu do oceniania odpowiedzi według rubryki.</td></tr>
+<tr><td><b>Logity</b></td><td>Surowe wyniki modelu dla każdego tokenu słownika przed softmaxem.</td></tr>
+<tr><td><b>LoRA / QLoRA</b></td><td>Dostrajanie małych macierzy-adapterów zamiast wszystkich wag (QLoRA: model bazowy w 4 bitach).</td></tr>
+<tr><td><b>MCP</b></td><td>Model Context Protocol — standard łączenia aplikacji AI z narzędziami i danymi.</td></tr>
+<tr><td><b>MoE</b></td><td>Mixture of Experts — architektura, w której na token aktywna jest tylko część parametrów.</td></tr>
+<tr><td><b>MRR</b></td><td>Mean Reciprocal Rank — średnia z 1/pozycji pierwszego trafnego wyniku.</td></tr>
+<tr><td><b>Multimodalność</b></td><td>Obsługa wielu typów danych: tekst, obraz, audio, wideo.</td></tr>
+<tr><td><b>Open-weight</b></td><td>Model z publicznie dostępnymi wagami, możliwy do uruchomienia samodzielnie.</td></tr>
+<tr><td><b>pgvector</b></td><td>Rozszerzenie Postgresa do przechowywania i wyszukiwania wektorów.</td></tr>
+<tr><td><b>Prompt caching</b></td><td>Cache stałego prefiksu promptu po stronie dostawcy — taniej i szybciej.</td></tr>
+<tr><td><b>Prompt injection</b></td><td>Atak polegający na przemyceniu instrukcji do kontekstu modelu.</td></tr>
+<tr><td><b>RAG</b></td><td>Retrieval-Augmented Generation — generowanie odpowiedzi na podstawie wyszukanych dokumentów.</td></tr>
+<tr><td><b>ReAct</b></td><td>Wzorzec przeplatania rozumowania i akcji (narzędzi).</td></tr>
+<tr><td><b>Recall@k</b></td><td>Odsetek przypadków, w których właściwy wynik jest w top-k.</td></tr>
+<tr><td><b>Reranking</b></td><td>Ponowne, dokładniejsze uszeregowanie kandydatów z wyszukiwania.</td></tr>
+<tr><td><b>RLHF</b></td><td>Reinforcement Learning from Human Feedback — dostrajanie na ocenach ludzi.</td></tr>
+<tr><td><b>RRF</b></td><td>Reciprocal Rank Fusion — łączenie rankingów: Σ 1/(k + pozycja).</td></tr>
+<tr><td><b>SFT</b></td><td>Supervised Fine-Tuning — trening na parach wejście→wzorcowa odpowiedź.</td></tr>
+<tr><td><b>Softmax</b></td><td>Funkcja zamieniająca logity na rozkład prawdopodobieństwa.</td></tr>
+<tr><td><b>Stop reason</b></td><td>Powód zakończenia generowania: koniec, limit tokenów, narzędzie, stop sequence.</td></tr>
+<tr><td><b>Structured output</b></td><td>Wymuszenie odpowiedzi zgodnej ze schematem JSON.</td></tr>
+<tr><td><b>System prompt</b></td><td>Instrukcje dewelopera ustalające rolę, zasady i format modelu.</td></tr>
+<tr><td><b>Temperature</b></td><td>Parametr losowości samplingu; niska = przewidywalnie, wysoka = różnorodnie.</td></tr>
+<tr><td><b>Token</b></td><td>Jednostka tekstu przetwarzana przez model (słowo, część słowa, znak).</td></tr>
+<tr><td><b>Tool calling</b></td><td>Mechanizm, w którym model zwraca prośbę o wywołanie funkcji z argumentami.</td></tr>
+<tr><td><b>Top-p / top-k</b></td><td>Ograniczenie samplingu do najbardziej prawdopodobnych tokenów (wg masy prawdopodobieństwa / liczby).</td></tr>
+<tr><td><b>Tracing</b></td><td>Rejestrowanie drzewa operacji jednego żądania (wywołania LLM, narzędzia, czasy, koszty).</td></tr>
+<tr><td><b>Transformer</b></td><td>Architektura sieci neuronowej oparta na attention — podstawa współczesnych LLM.</td></tr>
+<tr><td><b>TTFT</b></td><td>Time To First Token — czas do pojawienia się pierwszego tokenu odpowiedzi.</td></tr>
+<tr><td><b>vLLM</b></td><td>Wydajny serwer do hostowania modeli open-weight na GPU.</td></tr>
+</table></div>
+
+<div class="callout tip"><span class="t">Co dalej</span>Wróć do modułów, których quizy sprawiły trudność, i rozpocznij Projekt 1 z modułu 17. Najszybciej uczysz się, budując i mierząc.</div>
+</section>

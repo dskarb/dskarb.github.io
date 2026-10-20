@@ -1,0 +1,195 @@
+<section class="module" id="m12" data-num="12" data-title="Model Context Protocol">
+<div class="module-head"><div class="kicker">Moduł 12 · Działanie</div><h1>Model Context Protocol (MCP)</h1>
+<p>Otwarty standard podłączania narzędzi i danych do aplikacji AI. Architektura, prymitywy, własny serwer w TypeScript, klient w Twojej aplikacji i bezpieczeństwo.</p>
+<div class="goals"><span>host / client / server</span><span>tools, resources, prompts</span><span>serwer MCP w TS</span><span>klient MCP + LLM</span><span>zagrożenia</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> MCP to „USB-C dla AI”: piszesz serwer z narzędziami raz, a może z niego korzystać każda aplikacja zgodna z MCP (Claude, IDE, agenci, Twoja aplikacja). Komunikacja to JSON-RPC 2.0 przez stdio (lokalnie) albo HTTP (zdalnie).</div>
+
+<h2>Problem, który rozwiązuje</h2>
+<figure>
+<svg viewBox="0 0 680 230">
+<g font-size="12" font-weight="600" text-anchor="middle">
+<text x="160" y="18" class="svg-text">Bez MCP: M × N integracji</text>
+<g><rect x="20" y="40" width="90" height="30" rx="7" class="svg-box"/><text x="65" y="60" class="svg-text">Claude</text><rect x="20" y="95" width="90" height="30" rx="7" class="svg-box"/><text x="65" y="115" class="svg-text">IDE</text><rect x="20" y="150" width="90" height="30" rx="7" class="svg-box"/><text x="65" y="170" class="svg-text">Twoja app</text></g>
+<g><rect x="210" y="40" width="90" height="30" rx="7" class="svg-box"/><text x="255" y="60" class="svg-text">GitHub</text><rect x="210" y="95" width="90" height="30" rx="7" class="svg-box"/><text x="255" y="115" class="svg-text">Postgres</text><rect x="210" y="150" width="90" height="30" rx="7" class="svg-box"/><text x="255" y="170" class="svg-text">Slack</text></g>
+<g stroke="var(--bad)" stroke-width="1.2"><path d="M110 55L210 55M110 55L210 110M110 55L210 165M110 110L210 55M110 110L210 110M110 110L210 165M110 165L210 55M110 165L210 110M110 165L210 165"/></g>
+<text x="160" y="210" class="svg-muted" font-size="11">9 osobnych integracji</text>
+<text x="520" y="18" class="svg-text">Z MCP: M + N</text>
+<g><rect x="380" y="40" width="90" height="30" rx="7" class="svg-box"/><text x="425" y="60" class="svg-text">Claude</text><rect x="380" y="95" width="90" height="30" rx="7" class="svg-box"/><text x="425" y="115" class="svg-text">IDE</text><rect x="380" y="150" width="90" height="30" rx="7" class="svg-box"/><text x="425" y="170" class="svg-text">Twoja app</text></g>
+<rect x="490" y="80" width="60" height="60" rx="30" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="520" y="115" class="svg-text">MCP</text>
+<g><rect x="570" y="40" width="90" height="30" rx="7" class="svg-box"/><text x="615" y="60" class="svg-text">GitHub</text><rect x="570" y="95" width="90" height="30" rx="7" class="svg-box"/><text x="615" y="115" class="svg-text">Postgres</text><rect x="570" y="150" width="90" height="30" rx="7" class="svg-box"/><text x="615" y="170" class="svg-text">Slack</text></g>
+<g stroke="var(--ok)" stroke-width="1.5"><path d="M470 55L492 100M470 110H490M470 165L492 122M548 100L570 55M550 110H570M548 122L570 165"/></g>
+<text x="520" y="210" class="svg-muted" font-size="11">6 implementacji standardu</text>
+</g>
+</svg>
+</figure>
+
+<h2>Architektura</h2>
+<div class="grid">
+<div class="card"><h4>🏠 Host</h4><p>Aplikacja AI, z którą pracuje użytkownik: Claude (desktop/web), IDE, Claude Code, Twój czat. Zarządza klientami i zgodami użytkownika.</p></div>
+<div class="card"><h4>🔌 Client</h4><p>Komponent w hoście utrzymujący połączenie 1:1 z jednym serwerem. Pobiera listę narzędzi, wywołuje je, przekazuje wyniki do modelu.</p></div>
+<div class="card"><h4>🧰 Server</h4><p>Program udostępniający możliwości: narzędzia, zasoby, prompty. Może działać lokalnie (proces) albo zdalnie (usługa HTTP).</p></div>
+</div>
+<div class="table-wrap"><table>
+<tr><th>Transport</th><th>Jak działa</th><th>Kiedy</th></tr>
+<tr><td><b>stdio</b></td><td>Host uruchamia serwer jako proces potomny; JSON-RPC przez stdin/stdout</td><td>Narzędzia lokalne: pliki, git, lokalna baza</td></tr>
+<tr><td><b>Streamable HTTP</b></td><td>Serwer pod adresem URL; żądania POST, odpowiedzi opcjonalnie strumieniowane (SSE); autoryzacja OAuth</td><td>Usługi zdalne: SaaS, firmowe API, wielu użytkowników</td></tr>
+</table></div>
+
+<h2>Prymitywy MCP</h2>
+<div class="table-wrap"><table>
+<tr><th>Prymityw</th><th>Kto kontroluje</th><th>Co to jest</th><th>Przykład</th></tr>
+<tr><td><b>Tools</b></td><td>Model</td><td>Funkcje, które model może wywołać</td><td><code>create_issue</code>, <code>run_query</code></td></tr>
+<tr><td><b>Resources</b></td><td>Aplikacja / użytkownik</td><td>Dane tylko do odczytu adresowane URI, dołączane do kontekstu</td><td><code>file:///README.md</code>, <code>db://schema</code></td></tr>
+<tr><td><b>Prompts</b></td><td>Użytkownik</td><td>Gotowe szablony wywoływane świadomie (często jako komendy „/”)</td><td><code>/code-review</code></td></tr>
+</table></div>
+<p>Serwer może też korzystać z możliwości klienta: <b>sampling</b> (poproś model hosta o generację), <b>elicitation</b> (zapytaj użytkownika o dodatkowe dane), <b>roots</b> (do których folderów serwer ma dostęp).</p>
+
+<h3>Przebieg sesji</h3>
+<div class="widget" data-widget="stepper">
+<div class="w-title">Wymiana komunikatów JSON-RPC</div>
+<div class="steps">
+<div class="step"><span class="lbl user">client→</span><code>initialize</code> — wersja protokołu, możliwości klienta</div>
+<div class="step"><span class="lbl obs">←server</span>Możliwości serwera: <code>{ tools: {}, resources: {}, prompts: {} }</code></div>
+<div class="step"><span class="lbl user">client→</span><code>tools/list</code></div>
+<div class="step"><span class="lbl obs">←server</span><code>[{ name: "get_order", description: "...", inputSchema: {...} }]</code></div>
+<div class="step"><span class="lbl thought">host</span>Host przekazuje listę narzędzi modelowi razem z wiadomością użytkownika. Model prosi o <code>get_order</code>.</div>
+<div class="step"><span class="lbl action">client→</span><code>tools/call { name: "get_order", arguments: { order_id: "481" } }</code></div>
+<div class="step"><span class="lbl obs">←server</span><code>{ content: [{ type: "text", text: "{\"status\":\"w drodze\"}" }] }</code></div>
+<div class="step"><span class="lbl final">host</span>Wynik wraca do modelu jako tool_result — dalej tak samo jak w module 11.</div>
+</div>
+<div class="controls"><button class="btn next">Następny krok</button><button class="btn secondary auto">▶ Auto</button><button class="btn secondary reset">Reset</button><span class="cnt stat"></span></div>
+</div>
+
+<h2>Własny serwer MCP w TypeScript</h2>
+<code-block lang="bash" file="terminal">
+mkdir mcp-orders && cd mcp-orders && npm init -y
+npm i @modelcontextprotocol/sdk zod
+npm i -D tsx typescript @types/node
+</code-block>
+<code-block lang="typescript" file="server.ts">
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+const server = new McpServer({ name: "orders-server", version: "1.0.0" });
+
+const ORDERS: Record<string, { status: string; eta: string }> = {
+  "481": { status: "w drodze", eta: "2026-10-14" },
+  "482": { status: "dostarczone", eta: "2026-10-10" },
+};
+
+// TOOL — model sam decyduje, kiedy go użyć
+server.registerTool(
+  "get_order",
+  {
+    title: "Status zamówienia",
+    description: "Zwraca status i przewidywaną datę dostawy zamówienia o podanym numerze.",
+    inputSchema: { order_id: z.string().describe("Numer zamówienia, np. '481'") },
+  },
+  async ({ order_id }) => {
+    const order = ORDERS[order_id];
+    if (!order) {
+      return { content: [{ type: "text", text: `Brak zamówienia ${order_id}.` }], isError: true };
+    }
+    return { content: [{ type: "text", text: JSON.stringify(order) }] };
+  },
+);
+
+// RESOURCE — dane do dołączenia do kontekstu
+server.registerResource(
+  "return-policy",
+  "policy://zwroty",
+  { title: "Polityka zwrotów", description: "Aktualny regulamin zwrotów", mimeType: "text/markdown" },
+  async (uri) => ({
+    contents: [{ uri: uri.href, text: "# Zwroty\nZwrot w ciągu 14 dni bez podania przyczyny." }],
+  }),
+);
+
+// PROMPT — szablon wywoływany przez użytkownika
+server.registerPrompt(
+  "complaint-reply",
+  {
+    title: "Odpowiedź na reklamację",
+    description: "Przygotowuje uprzejmą odpowiedź na reklamację klienta",
+    argsSchema: { complaint: z.string() },
+  },
+  ({ complaint }) => ({
+    messages: [{
+      role: "user",
+      content: { type: "text", text: `Napisz uprzejmą odpowiedź na reklamację, zgodną z polityką zwrotów:\n\n${complaint}` },
+    }],
+  }),
+);
+
+await server.connect(new StdioServerTransport());
+console.error("orders-server działa"); // przy stdio loguj na stderr — stdout jest kanałem protokołu!
+</code-block>
+<div class="callout warn"><span class="t">Najczęstszy błąd</span>Przy transporcie stdio <code>console.log</code> wypisuje na stdout, które jest zarezerwowane dla komunikatów JSON-RPC. Jedno przypadkowe logowanie psuje protokół. Używaj <code>console.error</code>.</div>
+<h3>Testowanie i podłączenie</h3>
+<code-block lang="bash" file="terminal">
+# Inspector — graficzne narzędzie do testowania serwerów MCP
+npx @modelcontextprotocol/inspector npx tsx server.ts
+
+# Podłączenie do Claude Code
+claude mcp add orders -- npx tsx /pełna/ścieżka/server.ts
+</code-block>
+<code-block lang="json" file="claude_desktop_config.json (Claude Desktop)">
+{
+  "mcpServers": {
+    "orders": {
+      "command": "npx",
+      "args": ["tsx", "/pełna/ścieżka/mcp-orders/server.ts"]
+    }
+  }
+}
+</code-block>
+
+<h2>Klient MCP we własnej aplikacji</h2>
+<p>Twoja aplikacja może korzystać z dowolnego serwera MCP i przekazywać jego narzędzia modelowi — tak łączysz moduł 11 z MCP.</p>
+<code-block lang="typescript" file="src/mcp-host.ts">
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import Anthropic from "@anthropic-ai/sdk";
+
+const mcp = new Client({ name: "my-chat-app", version: "1.0.0" });
+await mcp.connect(new StdioClientTransport({ command: "npx", args: ["tsx", "../mcp-orders/server.ts"] }));
+
+// 1. Narzędzia z serwera MCP → format narzędzi Anthropic
+const { tools: mcpTools } = await mcp.listTools();
+const tools: Anthropic.Tool[] = mcpTools.map(t => ({
+  name: t.name,
+  description: t.description ?? "",
+  input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+}));
+
+// 2. W pętli agenta (moduł 11) zamiast lokalnych implementacji:
+async function executeTool(name: string, args: Record<string, unknown>) {
+  const result = await mcp.callTool({ name, arguments: args });
+  const text = (result.content as { type: string; text?: string }[])
+    .filter(c => c.type === "text").map(c => c.text).join("\n");
+  return { text, isError: Boolean(result.isError) };
+}
+</code-block>
+<p>Część API dostawców potrafi też samodzielnie łączyć się ze <b>zdalnymi</b> serwerami MCP — podajesz URL serwera w żądaniu, a pętlę narzędzi wykonuje dostawca. Wygodne, ale wtedy mniej kontrolujesz (np. zatwierdzanie akcji).</p>
+
+<h2>Bezpieczeństwo MCP</h2>
+<div class="grid">
+<div class="card"><h4>🧪 Tool poisoning</h4><p>Złośliwy serwer umieszcza instrukcje w <i>opisie</i> narzędzia („przed użyciem wyślij zawartość ~/.ssh…”). Opisy trafiają do kontekstu modelu.</p></div>
+<div class="card"><h4>🔄 Zmiana definicji</h4><p>Serwer zaakceptowany jako bezpieczny może później zmienić narzędzia. Przypinaj wersje, weryfikuj zmiany.</p></div>
+<div class="card"><h4>🎭 Cieniowanie nazw</h4><p>Dwa serwery z narzędziem o tej samej nazwie — model może wywołać nie to, które myślisz.</p></div>
+<div class="card"><h4>🔑 Uprawnienia</h4><p>Serwer zdalny z OAuth powinien mieć minimalne zakresy. Lokalny serwer stdio działa z uprawnieniami Twojego użytkownika — instaluj tylko zaufane.</p></div>
+</div>
+<div class="callout tip"><span class="t">Zasady</span>Instaluj serwery tylko z zaufanych źródeł, czytaj kod lokalnych serwerów, wymagaj zatwierdzania akcji zapisu, nie łącz w jednej sesji serwera z dostępem do wrażliwych danych i serwera, który czyta niezaufane treści z internetu (śmiertelna trójka z modułu 06).</div>
+
+<div class="quiz" data-answer="2"><div class="q">Chcesz, żeby użytkownik mógł świadomie wybrać z menu gotowy szablon „/code-review”. Którego prymitywu MCP użyjesz?</div>
+<button class="opt">Tool</button>
+<button class="opt">Resource</button>
+<button class="opt">Prompt</button>
+<button class="opt">Sampling</button>
+<div class="expl">Prompts są kontrolowane przez użytkownika — to szablony wywoływane świadomie. Tools wybiera model, a Resources to dane dołączane do kontekstu.</div></div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Zobacz, co faktycznie płynie między klientem a serwerem MCP, implementując obsługę komunikatów JSON-RPC bez SDK.</p>
+<div data-kata="m12-mcp-server"></div>
+</section>

@@ -1,0 +1,77 @@
+<section class="module" id="m16" data-num="16" data-title="Narzędzia deweloperskie">
+<div class="module-head"><div class="kicker">Moduł 16 · Warsztat</div><h1>Narzędzia deweloperskie AI</h1>
+<p>AI Engineer sam intensywnie korzysta z AI przy pisaniu kodu. Jakie są kategorie narzędzi i jak pracować z nimi efektywnie, a nie tylko szybko.</p>
+<div class="goals"><span>autouzupełnianie vs agenci</span><span>pliki kontekstu</span><span>workflow z agentem</span><span>ryzyka</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> Agent kodujący jest tak dobry, jak kontekst i pętla informacji zwrotnej, które mu dasz: jasne zadanie, plik z konwencjami projektu, testy i typy, które może uruchomić, oraz Twój review każdej zmiany.</div>
+
+<h2>Kategorie narzędzi</h2>
+<div class="grid">
+<div class="card"><h4>⌨️ Autouzupełnianie</h4><p>Podpowiedzi w edytorze podczas pisania (np. GitHub Copilot). Szybkie, lokalny kontekst pliku. Dobre do boilerplate'u.</p></div>
+<div class="card"><h4>💬 Czat w IDE</h4><p>Pytania o kod, wyjaśnienia, refaktor zaznaczonego fragmentu. Cursor, VS Code + Copilot Chat, JetBrains AI, Windsurf.</p></div>
+<div class="card"><h4>🤖 Agenci kodujący</h4><p>Samodzielnie czytają repo, edytują wiele plików, uruchamiają testy i komendy. Claude Code, Codex, Gemini CLI, tryby agentowe w IDE.</p></div>
+<div class="card"><h4>☁️ Agenci w tle</h4><p>Zadanie z issue → agent pracuje w chmurze → otwiera pull request do review. Dobre do dobrze zdefiniowanych, niezależnych zadań.</p></div>
+<div class="card"><h4>🔍 Review i bezpieczeństwo</h4><p>Automatyczne code review PR-ów, wykrywanie podatności, generowanie testów.</p></div>
+<div class="card"><h4>🧪 Playgroundy i konsole</h4><p>Panele dostawców do testowania promptów, parametrów i narzędzi przed napisaniem kodu.</p></div>
+</div>
+
+<h2>Plik kontekstu projektu</h2>
+<p>Większość agentów czyta plik z instrukcjami w katalogu głównym repozytorium (np. <code>CLAUDE.md</code>, <code>AGENTS.md</code> lub reguły w konfiguracji IDE). To system prompt dla Twojego projektu — oszczędza powtarzania tych samych uwag.</p>
+<code-block lang="markdown" file="CLAUDE.md">
+# Projekt: panel sklepu (Next.js 15, TypeScript, Supabase)
+
+## Komendy
+- `npm run dev` — serwer deweloperski
+- `npm test` — testy (Vitest); uruchom po każdej zmianie logiki
+- `npm run typecheck` — musi przechodzić przed commitem
+
+## Konwencje
+- Komponenty serwerowe domyślnie; "use client" tylko gdy potrzebny stan/efekty
+- Walidacja wejścia API przez Zod w `src/lib/schemas.ts`
+- Wywołania LLM wyłącznie przez `src/ai/client.ts` (retry, tracing, limity)
+- Prompty w `prompts/*.md`, nie w kodzie
+
+## Nie rób
+- Nie modyfikuj plików w `src/generated/` — są generowane z bazy
+- Nie dodawaj zależności bez pytania
+</code-block>
+
+<h2>Efektywny workflow z agentem</h2>
+<div class="widget" data-widget="stepper">
+<div class="w-title">Od zadania do merge</div>
+<div class="steps">
+<div class="step"><span class="lbl user">1. kontekst</span>Opisz cel, ograniczenia i kryteria akceptacji. Wskaż pliki-przykłady („zrób jak w <code>OrdersTable.tsx</code>”).</div>
+<div class="step"><span class="lbl thought">2. plan</span>Przy większych zmianach poproś najpierw o plan bez edycji. Popraw plan — to tańsze niż poprawianie kodu.</div>
+<div class="step"><span class="lbl action">3. małe kroki</span>Realizacja etapami. Każdy etap kończy się działającym stanem i commitem.</div>
+<div class="step"><span class="lbl obs">4. weryfikacja</span>Agent uruchamia testy, typecheck, linter. Testy napisane przed implementacją to najlepszy sygnał „gotowe”.</div>
+<div class="step"><span class="lbl final">5. review</span>Czytasz diff jak PR od kolegi. Odpowiadasz za każdą linijkę, którą mergujesz.</div>
+</div>
+<div class="controls"><button class="btn next">Następny krok</button><button class="btn secondary auto">▶ Auto</button><button class="btn secondary reset">Reset</button><span class="cnt stat"></span></div>
+</div>
+
+<div class="vs">
+<div class="bad-ex">dodaj eksport do csv</div>
+<div class="good-ex">Dodaj przycisk „Eksport CSV” w OrdersTable.tsx.
+Eksportuje aktualnie przefiltrowane zamówienia
+(kolumny jak w tabeli, separator ;, UTF-8 z BOM
+dla Excela). Logika w src/lib/csv.ts + testy
+jednostkowe dla polskich znaków i średników
+w treści. Bez nowych zależności.</div>
+</div>
+
+<h2>Ryzyka i dobre praktyki</h2>
+<ul class="checklist">
+<li><input type="checkbox" data-id="m16-1"><span><b>Sekrety</b>: pliki <code>.env</code> poza zasięgiem agenta lub wykluczone; nie wklejaj kluczy do czatu.</span></li>
+<li><input type="checkbox" data-id="m16-2"><span><b>Uprawnienia</b>: agent pyta o zgodę przed komendami destrukcyjnymi; nie uruchamiaj w trybie „zezwól na wszystko” na produkcyjnych danych.</span></li>
+<li><input type="checkbox" data-id="m16-3"><span><b>Zmyślone API</b>: agent może użyć nieistniejącej funkcji biblioteki lub nieaktualnej wersji API — typy i testy to wyłapią.</span></li>
+<li><input type="checkbox" data-id="m16-4"><span><b>Zależności</b>: sprawdzaj każdą nową paczkę (literówki w nazwach to wektor ataku supply chain).</span></li>
+<li><input type="checkbox" data-id="m16-5"><span><b>Rozumienie</b>: jeśli nie potrafisz wyjaśnić kodu na review, nie merguj go.</span></li>
+<li><input type="checkbox" data-id="m16-6"><span><b>Polityka firmy</b>: sprawdź, które narzędzia i z jakimi ustawieniami prywatności są dozwolone dla kodu klienta.</span></li>
+</ul>
+
+<div class="callout tip"><span class="t">Jak to łączy się z resztą kompendium</span>Agenci kodujący to dokładnie ta architektura z modułu 11 (pętla + narzędzia: odczyt plików, edycja, terminal), często z serwerami MCP z modułu 12 i plikami kontekstu z modułu 05. Obserwując, jak działają, uczysz się projektować własnych agentów.</div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Ćwiczenie z agentem kodującym: weź dowolne zadanie z kodem z tego kompendium, skopiuj treść i testy do swojego repo i rozwiąż je z agentem (Claude Code, Codex, Cursor). Porównaj: ile iteracji potrzebował, czy uruchamiał testy, czy jego rozwiązanie jest czytelniejsze od Twojego. Potem zrób to samo z dobrym plikiem <code>CLAUDE.md</code>/<code>AGENTS.md</code> i porównaj wynik.</p>
+
+</section>

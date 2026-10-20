@@ -1,0 +1,196 @@
+<section class="module" id="m07" data-num="07" data-title="Open-source AI">
+<div class="module-head"><div class="kicker">Moduł 07 · Sterowanie modelem</div><h1>Open-source AI: Hugging Face, Ollama, modele lokalne</h1>
+<p>Jak znaleźć, uruchomić i wdrożyć model z otwartymi wagami — w Pythonie, w przeglądarce i lokalnie na własnym komputerze.</p>
+<div class="goals"><span>Hugging Face Hub</span><span>transformers / transformers.js</span><span>Ollama</span><span>kwantyzacja i VRAM</span><span>serving: vLLM</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> „Open-source” w AI to zwykle <b>open-weight</b>: dostajesz wagi modelu i możesz go uruchomić u siebie. Hugging Face to „GitHub modeli”, Ollama to „Docker dla LLM na laptopie”, vLLM to serwer produkcyjny. Kwantyzacja pozwala zmieścić duży model na mniejszym GPU kosztem niewielkiej utraty jakości.</div>
+
+<h2>Hugging Face Hub</h2>
+<div class="grid">
+<div class="card"><h4>🤖 Models</h4><p>Setki tysięcy modeli: LLM, embeddingi, klasyfikatory, rozpoznawanie mowy, wizja. Każdy ma <b>model card</b> z opisem, licencją, ograniczeniami.</p></div>
+<div class="card"><h4>📊 Datasets</h4><p>Zbiory danych do treningu i ewaluacji, ładowane jedną linijką biblioteką <code>datasets</code>.</p></div>
+<div class="card"><h4>🚀 Spaces</h4><p>Demo aplikacji (Gradio, Streamlit) — szybki sposób, żeby przetestować model w przeglądarce przed integracją.</p></div>
+<div class="card"><h4>⚙️ Inference</h4><p>Uruchamianie modeli przez API Hugging Face lub partnerów, bez własnego GPU.</p></div>
+</div>
+
+<h3>Jak czytać nazwę modelu</h3>
+<figure>
+<svg viewBox="0 0 680 150">
+<g font-family="var(--mono)" font-size="17" font-weight="700">
+<text x="20" y="50"><tspan fill="var(--c1)">Qwen3</tspan><tspan class="svg-muted">-</tspan><tspan fill="var(--c2)">8B</tspan><tspan class="svg-muted">-</tspan><tspan fill="var(--c3)">Instruct</tspan><tspan class="svg-muted">-</tspan><tspan fill="var(--c4)">GGUF</tspan><tspan class="svg-muted">:</tspan><tspan fill="var(--c6)">Q4_K_M</tspan></text>
+</g>
+<g font-size="12">
+<text x="20" y="85" fill="var(--c1)" font-weight="700">rodzina</text><text x="20" y="102" class="svg-muted">twórca i wersja</text>
+<text x="140" y="85" fill="var(--c2)" font-weight="700">8 mld parametrów</text><text x="140" y="102" class="svg-muted">rozmiar → pamięć</text>
+<text x="290" y="85" fill="var(--c3)" font-weight="700">Instruct / Chat</text><text x="290" y="102" class="svg-muted">dostrojony do poleceń</text><text x="290" y="118" class="svg-muted">(Base = surowy)</text>
+<text x="450" y="85" fill="var(--c4)" font-weight="700">format pliku</text><text x="450" y="102" class="svg-muted">llama.cpp / Ollama</text>
+<text x="570" y="85" fill="var(--c6)" font-weight="700">kwantyzacja</text><text x="570" y="102" class="svg-muted">~4 bity / waga</text>
+</g>
+</svg>
+<figcaption>Do aplikacji czatowych wybieraj warianty <b>Instruct/Chat</b>. Modele <b>Base</b> tylko kontynuują tekst — przydatne głównie do fine-tuningu. Skróty MoE (np. „30B-A3B”) oznaczają Mixture of Experts: 30 mld parametrów łącznie, ale tylko ~3 mld aktywnych na token — szybkie jak mały model, pamięciożerne jak duży.</figcaption>
+</figure>
+
+<div class="callout warn"><span class="t">Licencje mają znaczenie</span>Apache 2.0 i MIT pozwalają na prawie wszystko. Licencje „community” (np. niektóre wersje Llama, Gemma) dopuszczają użycie komercyjne, ale z warunkami (limity użytkowników, polityka użycia, wymóg atrybucji). Zawsze czytaj licencję przed wdrożeniem komercyjnym.</div>
+
+<h2>Biblioteka transformers (Python)</h2>
+<p>Najszybszy start to <code>pipeline</code> — jedna linijka na typowe zadanie. Model pobierze się automatycznie przy pierwszym uruchomieniu.</p>
+<code-block lang="python" file="hf_pipelines.py">
+from transformers import pipeline
+
+# Klasyfikacja zero-shot: kategorie podajesz w locie, bez treningu
+clf = pipeline("zero-shot-classification", model="MoritzLaurer/mDeBERTa-v3-base-mnli-xnli")
+print(clf("Paczka przyszła uszkodzona i chcę zwrot pieniędzy",
+          candidate_labels=["reklamacja", "pytanie o produkt", "pochwała"]))
+# {'labels': ['reklamacja', ...], 'scores': [0.94, ...]}
+
+# Rozpoznawanie nazw własnych (NER)
+ner = pipeline("ner", model="Babelscape/wikineural-multilingual-ner", aggregation_strategy="simple")
+print(ner("Jan Kowalski pracuje w Rzeszowie dla firmy Asseco."))
+
+# Transkrypcja mowy
+asr = pipeline("automatic-speech-recognition", model="openai/whisper-small")
+print(asr("nagranie.mp3")["text"])
+</code-block>
+
+<h3>Generowanie tekstu lokalnym LLM-em</h3>
+<code-block lang="python" file="hf_generate.py">
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+model_id = "Qwen/Qwen3-1.7B"  # mały model, zadziała nawet na CPU (wolno)
+tok = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype="auto", device_map="auto")
+
+messages = [
+    {"role": "system", "content": "Odpowiadaj krótko po polsku."},
+    {"role": "user", "content": "Czym jest embedding?"},
+]
+# chat template zamienia listę wiadomości na format, na którym model był trenowany
+inputs = tok.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(model.device)
+
+with torch.no_grad():
+    out = model.generate(inputs, max_new_tokens=200, temperature=0.7, do_sample=True)
+print(tok.decode(out[0][inputs.shape[-1]:], skip_special_tokens=True))
+</code-block>
+<div class="callout"><span class="t">Chat template</span>Każda rodzina modeli ma własny format specjalnych tokenów oddzielających role (system/user/assistant). Zawsze używaj <code>apply_chat_template</code> zamiast ręcznego sklejania — zły format drastycznie obniża jakość.</div>
+
+<h2>transformers.js — AI w przeglądarce i Node</h2>
+<p>Dla frontendowca to perełka: te same modele (w formacie ONNX) działają w przeglądarce przez WebAssembly/WebGPU. Zero kosztów serwera, dane nie opuszczają urządzenia.</p>
+<code-block lang="typescript" file="src/browser-embeddings.ts">
+import { pipeline } from "@huggingface/transformers";
+
+// Model (~25 MB) pobiera się raz i zostaje w cache przeglądarki
+const extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+
+const output = await extractor(["Jak zresetować hasło?", "Nie pamiętam hasła do konta"], {
+  pooling: "mean",
+  normalize: true,
+});
+const [a, b] = output.tolist() as number[][];
+const cosine = a.reduce((s, x, i) => s + x * b[i], 0); // znormalizowane → iloczyn skalarny = cosine
+console.log(cosine.toFixed(3)); // wysoka wartość = podobne znaczenie
+
+// Analiza sentymentu w przeglądarce
+const sentiment = await pipeline("sentiment-analysis");
+console.log(await sentiment("I love this product!"));
+</code-block>
+<p>Zastosowania: wyszukiwanie semantyczne w aplikacji offline, filtrowanie treści przed wysłaniem na serwer, podpowiedzi w edytorze, rozpoznawanie mowy w przeglądarce.</p>
+
+<h2>Ollama — LLM na laptopie w 2 minuty</h2>
+<code-block lang="bash" file="terminal">
+# instalacja: ollama.com (macOS/Windows) lub:
+curl -fsSL https://ollama.com/install.sh | sh
+
+ollama pull llama3.2          # pobierz model (nazwy w bibliotece ollama.com)
+ollama run llama3.2           # interaktywny czat w terminalu
+ollama pull nomic-embed-text  # model embeddingów
+ollama list                   # pobrane modele
+ollama ps                     # co jest załadowane do pamięci
+</code-block>
+<code-block lang="typescript" file="src/ollama.ts">
+// 1) natywne REST API Ollamy
+const res = await fetch("http://localhost:11434/api/chat", {
+  method: "POST",
+  body: JSON.stringify({
+    model: "llama3.2",
+    messages: [{ role: "user", content: "Podaj 3 zastosowania RAG." }],
+    stream: false,
+    options: { temperature: 0.3 },
+  }),
+});
+const data = await res.json();
+console.log(data.message.content);
+
+// 2) embeddingi
+const emb = await fetch("http://localhost:11434/api/embed", {
+  method: "POST",
+  body: JSON.stringify({ model: "nomic-embed-text", input: ["tekst 1", "tekst 2"] }),
+}).then(r => r.json());
+console.log(emb.embeddings.length, emb.embeddings[0].length);
+
+// 3) endpoint zgodny z OpenAI — ten sam kod co dla chmury
+import OpenAI from "openai";
+const local = new OpenAI({ baseURL: "http://localhost:11434/v1", apiKey: "ollama" });
+const r = await local.chat.completions.create({
+  model: "llama3.2",
+  messages: [{ role: "user", content: "Cześć!" }],
+});
+console.log(r.choices[0].message.content);
+</code-block>
+<div class="callout tip"><span class="t">Workflow dewelopera</span>Lokalny model przez endpoint zgodny z OpenAI to świetne środowisko deweloperskie i testowe: darmowe, offline, bez limitów. Na produkcji podmieniasz <code>baseURL</code> i model na chmurowy.</div>
+
+<h2>Kwantyzacja i pamięć GPU</h2>
+<p>Każdy parametr modelu to liczba. W pełnej precyzji treningowej (FP16/BF16) zajmuje 2 bajty. Kwantyzacja zapisuje wagi na mniejszej liczbie bitów (8, 4, nawet 2–3). Model 8B w FP16 to ~16 GB, w 4 bitach ~5 GB.</p>
+<figure>
+<svg viewBox="0 0 600 220">
+<g font-size="12">
+<text x="10" y="20" font-weight="700" class="svg-text">Pamięć modelu 8B vs jakość (poglądowo)</text>
+<g><text x="10" y="58" class="svg-text">FP16</text><rect x="70" y="44" width="480" height="20" rx="4" fill="var(--c1)"/><text x="555" y="58" class="svg-text">16 GB</text></g>
+<g><text x="10" y="98" class="svg-text">INT8 / Q8</text><rect x="70" y="84" width="240" height="20" rx="4" fill="var(--c6)"/><text x="315" y="98" class="svg-text">8 GB · jakość ≈ FP16</text></g>
+<g><text x="10" y="138" class="svg-text">Q4</text><rect x="70" y="124" width="135" height="20" rx="4" fill="var(--c3)"/><text x="210" y="138" class="svg-text">~4.5–5 GB · niewielki spadek — złoty środek</text></g>
+<g><text x="10" y="178" class="svg-text">Q2–Q3</text><rect x="70" y="164" width="95" height="20" rx="4" fill="var(--c2)"/><text x="170" y="178" class="svg-text">~3 GB · wyraźny spadek jakości</text></g>
+</g>
+</svg>
+</figure>
+<div class="widget" data-widget="vram">
+<div class="w-title">Kalkulator pamięci (VRAM)</div>
+<div class="row">
+<div><label>Parametry (mld)</label><input type="number" name="params" value="8" step="0.5"></div>
+<div><label>Precyzja</label><select><option value="16">FP16 / BF16 (16 bit)</option><option value="8">INT8 / Q8 (8 bit)</option><option value="4.5" selected>Q4_K_M (~4.5 bit)</option><option value="3">Q3 (3 bit)</option></select></div>
+<div><label>Kontekst (tokeny)</label><input type="number" name="ctx" value="8000" step="1000"></div>
+</div>
+<div class="out"></div>
+<p style="font-size:.8rem;color:var(--muted);margin:.5em 0 0">Wzór: wagi = parametry × bity / 8; KV cache to zgrubne przybliżenie dla modeli z grouped-query attention w FP16 (realnie zależy od architektury); +15% na narzut. Do decyzji zakupowych testuj na realnym sprzęcie.</p>
+</div>
+
+<h2>Serving na produkcji</h2>
+<div class="table-wrap"><table>
+<tr><th>Narzędzie</th><th>Do czego</th><th>Cecha kluczowa</th></tr>
+<tr><td><b>Ollama</b></td><td>Lokalnie, dev, małe wdrożenia</td><td>Prostota, GGUF, jeden binarny plik</td></tr>
+<tr><td><b>llama.cpp</b></td><td>CPU, Apple Silicon, edge</td><td>Silnik pod spodem Ollamy, maksymalna przenośność</td></tr>
+<tr><td><b>vLLM</b></td><td>Produkcja na GPU, duży ruch</td><td>PagedAttention, continuous batching — wielokrotnie większa przepustowość; API zgodne z OpenAI</td></tr>
+<tr><td><b>TGI / SGLang / TensorRT-LLM</b></td><td>Produkcja, optymalizacje pod konkretne GPU</td><td>Wysoka wydajność, więcej konfiguracji</td></tr>
+</table></div>
+<code-block lang="bash" file="terminal (serwer z GPU)">
+pip install vllm
+vllm serve Qwen/Qwen3-8B --max-model-len 16384
+# → endpoint OpenAI-compatible na http://localhost:8000/v1
+</code-block>
+
+<h2>Kiedy self-hosting ma sens</h2>
+<div class="vs">
+<div class="card"><h4>✅ Tak</h4><p>Dane nie mogą opuścić infrastruktury (medycyna, prawo, sektor publiczny). Duży, stały wolumen prostych zadań. Potrzeba zamrożonej wersji modelu. Fine-tuning pod wąskie zadanie. Działanie offline / na urządzeniu.</p></div>
+<div class="card"><h4>❌ Raczej nie</h4><p>Mały lub zmienny ruch (GPU stoi bezczynnie, a płacisz). Potrzebujesz najwyższej jakości. Brak kompetencji DevOps/MLOps w zespole. Start projektu — najpierw udowodnij wartość na API.</p></div>
+</div>
+
+<div class="quiz" data-answer="2"><div class="q">Masz kartę graficzną z 12 GB VRAM. Który wariant modelu 14B prawdopodobnie zmieścisz z kontekstem 8k?</div>
+<button class="opt">FP16 (~28 GB samych wag)</button>
+<button class="opt">INT8 (~14 GB samych wag)</button>
+<button class="opt">Q4_K_M (~8 GB wag + KV cache i narzut)</button>
+<button class="opt">Żaden — modele 14B wymagają serwera</button>
+<div class="expl">14 mld × ~4.5 bita / 8 ≈ 7,9 GB na wagi. Z KV cache i narzutem mieści się w 12 GB. Sprawdź w kalkulatorze powyżej.</div></div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Policz wymagania sprzętowe przed zakupem GPU. Jeśli chcesz pracować z modelem lokalnie, skonfiguruj Ollamę według instrukcji w sekcji <a href="#lab">Laboratorium: jak zacząć</a> — wszystkie laboratoria działają też na niej.</p>
+<div data-kata="m07-vram"></div>
+</section>

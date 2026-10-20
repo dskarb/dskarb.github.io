@@ -1,0 +1,168 @@
+<section class="module" id="m02" data-num="02" data-title="Jak działają LLM">
+<div class="module-head"><div class="kicker">Moduł 02 · Fundamenty</div><h1>Jak działają duże modele językowe</h1>
+<p>Nie musisz umieć wytrenować modelu, ale musisz rozumieć jego mechanikę — bo z niej wynikają koszty, ograniczenia i to, jak pisać prompty.</p>
+<div class="goals"><span>tokeny i tokenizacja</span><span>transformer i attention</span><span>temperature / top-p</span><span>okno kontekstowe</span><span>halucynacje</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> LLM to funkcja: <code>tekst → rozkład prawdopodobieństwa następnego tokenu</code>. Generowanie to pętla: wylosuj token, dopisz go do wejścia, powtórz. Wszystko inne (rozmowa, rozumowanie, wywołania narzędzi) jest zbudowane na tej jednej operacji.</div>
+
+<h2>1. Przewidywanie następnego tokenu</h2>
+<p>Model nie „myśli zdaniami”. Dostaje sekwencję tokenów i zwraca prawdopodobieństwo każdego tokenu ze słownika (zwykle 100–250 tys. pozycji), że to on będzie następny. Generowanie jest <b>autoregresywne</b>: każdy nowy token staje się częścią wejścia dla kolejnego kroku.</p>
+<div class="widget" data-widget="stepper">
+<div class="w-title">Generowanie token po tokenie</div>
+<div class="steps">
+<div class="step"><span class="lbl user">wejście</span>Stolica Polski to</div>
+<div class="step"><span class="lbl thought">krok 1</span>P(„ Warszawa”)=0.92, P(„ miasto”)=0.03, P(„ Kraków”)=0.01 … → wybrano <b>„ Warszawa”</b></div>
+<div class="step"><span class="lbl thought">krok 2</span>Wejście: „Stolica Polski to Warszawa” → P(„.”)=0.71, P(„,”)=0.18 … → <b>„.”</b></div>
+<div class="step"><span class="lbl thought">krok 3</span>Wejście: „… Warszawa.” → P(„ Jest”)=0.22, P(&lt;koniec&gt;)=0.41 … → <b>&lt;koniec&gt;</b></div>
+<div class="step"><span class="lbl final">wynik</span>„Stolica Polski to Warszawa.” — 3 przebiegi modelu, 3 tokeny wyjściowe.</div>
+</div>
+<div class="controls"><button class="btn next">Następny krok</button><button class="btn secondary auto">▶ Auto</button><button class="btn secondary reset">Reset</button><span class="cnt stat"></span></div>
+</div>
+<div class="callout"><span class="t">Konsekwencje praktyczne</span>
+<ul style="margin:0">
+<li><b>Output jest droższy i wolniejszy niż input.</b> Wejście model przetwarza równolegle (jeden przebieg), a każdy token wyjścia wymaga osobnego kroku. Dlatego cennik za tokeny wyjściowe jest kilka razy wyższy.</li>
+<li><b>Latencja = czas do pierwszego tokenu (TTFT) + liczba tokenów × czas na token.</b> Krótsze odpowiedzi = szybsza aplikacja.</li>
+<li><b>Model „zobowiązuje się” do słów po kolei.</b> Jeśli każesz mu najpierw podać werdykt, a potem uzasadnienie, uzasadnienie będzie dopasowane do werdyktu. Kolejność w formacie odpowiedzi ma znaczenie.</li>
+</ul></div>
+
+<h2>2. Tokeny i tokenizacja</h2>
+<p>Token to fragment tekstu: całe słowo, część słowa, znak interpunkcyjny lub spacja ze słowem. Tokenizatory (najczęściej <b>BPE — Byte Pair Encoding</b>) uczą się słownika z korpusu: najczęstsze sekwencje znaków stają się pojedynczymi tokenami. Ponieważ korpusy są zdominowane przez angielski, <b>polski tekst zużywa zauważalnie więcej tokenów</b> na tę samą treść.</p>
+<div class="widget" data-widget="tokenizer">
+<div class="w-title">Tokenizer (symulacja BPE)</div>
+<textarea>Model językowy przewiduje następny token na podstawie kontekstu.</textarea>
+<div class="controls"><button class="btn secondary" data-sample="The language model predicts the next token based on context.">Przykład EN</button><button class="btn secondary" data-sample="Model językowy przewiduje następny token na podstawie kontekstu.">Ten sam tekst PL</button><button class="btn secondary" data-sample="const user = await db.users.findUnique({ where: { id: 42 } });">Kod</button><button class="btn secondary" data-sample="Zażółć gęślą jaźń! 1234567 🙂">Znaki specjalne</button></div>
+<div class="out"></div>
+<p style="font-size:.8rem;color:var(--muted);margin:.6em 0 0">To przybliżenie dydaktyczne. Prawdziwe tokenizatory różnią się między modelami — do liczenia kosztów używaj endpointów do liczenia tokenów lub bibliotek dostawcy.</p>
+</div>
+<div class="grid">
+<div class="card"><h4>Reguły kciuka</h4><p>Angielski: ~4 znaki ≈ 1 token, ~0,75 słowa ≈ 1 token. Polski: często 2,5–3,5 znaku/token. Kod: zależy od formatowania, wcięcia też są tokenami.</p></div>
+<div class="card"><h4>Dlaczego LLM źle liczy litery</h4><p>Model widzi tokeny, nie litery. Pytanie „ile jest «r» w słowie strawberry” dotyczy struktury, której model bezpośrednio nie widzi.</p></div>
+<div class="card"><h4>Liczby</h4><p>Liczby dzielone są na kawałki (np. po 1–3 cyfry), dlatego arytmetyka na dużych liczbach „w głowie” modelu jest zawodna. Daj mu kalkulator jako narzędzie.</p></div>
+</div>
+
+<h2>3. Co dzieje się w środku: transformer</h2>
+<p>Współczesne LLM-y to <b>transformery typu decoder-only</b>. Przejdź przez diagram krok po kroku:</p>
+<div class="widget" data-widget="svgstep">
+<div class="w-title">Przepływ przez transformer</div>
+<svg viewBox="0 0 700 300" style="width:100%">
+<g font-size="12.5" font-weight="600">
+<g data-s="1"><rect x="10" y="125" width="110" height="50" rx="10" class="svg-box" stroke="var(--c1)"/><text x="65" y="148" text-anchor="middle" class="svg-text">Tokeny</text><text x="65" y="165" text-anchor="middle" class="svg-muted" font-size="10.5">[1923, 812, 77]</text></g>
+<g data-s="2"><rect x="140" y="125" width="110" height="50" rx="10" class="svg-box" stroke="var(--c6)"/><text x="195" y="148" text-anchor="middle" class="svg-text">Embedding</text><text x="195" y="165" text-anchor="middle" class="svg-muted" font-size="10.5">+ pozycja</text></g>
+<g data-s="3 4"><rect x="270" y="40" width="190" height="220" rx="12" fill="none" stroke="var(--c4)" stroke-dasharray="5 4"/><text x="365" y="30" text-anchor="middle" class="svg-muted" font-size="11">× N warstw (np. 32–120)</text></g>
+<g data-s="3"><rect x="290" y="70" width="150" height="55" rx="10" fill="var(--accent-soft)" stroke="var(--c4)"/><text x="365" y="95" text-anchor="middle" class="svg-text">Self-attention</text><text x="365" y="112" text-anchor="middle" class="svg-muted" font-size="10.5">kto na kogo „patrzy”</text></g>
+<g data-s="4"><rect x="290" y="165" width="150" height="55" rx="10" fill="var(--accent-soft)" stroke="var(--c4)"/><text x="365" y="190" text-anchor="middle" class="svg-text">Feed-forward (MLP)</text><text x="365" y="207" text-anchor="middle" class="svg-muted" font-size="10.5">„wiedza” w wagach</text></g>
+<g data-s="5"><rect x="480" y="125" width="95" height="50" rx="10" class="svg-box" stroke="var(--c2)"/><text x="527" y="148" text-anchor="middle" class="svg-text">Logity</text><text x="527" y="165" text-anchor="middle" class="svg-muted" font-size="10.5">wynik / token</text></g>
+<g data-s="6"><rect x="590" y="125" width="100" height="50" rx="10" fill="var(--warn-soft)" stroke="var(--c2)"/><text x="640" y="148" text-anchor="middle" class="svg-text">Softmax</text><text x="640" y="165" text-anchor="middle" class="svg-muted" font-size="10.5">+ sampling</text></g>
+</g>
+<g class="svg-line" stroke-width="1.5"><path d="M120 150H140"/><path d="M250 150H270"/><path d="M365 125V165"/><path d="M460 150H480"/><path d="M575 150H590"/></g>
+</svg>
+<ol class="sdesc" hidden>
+<li>Tekst zamieniany jest na listę ID tokenów ze słownika.</li>
+<li>Każde ID zamieniane jest na wektor (np. 4096 liczb) — <b>embedding tokenu</b>. Dodawana jest informacja o pozycji, bo sama uwaga nie zna kolejności.</li>
+<li><b>Self-attention</b>: każdy token oblicza, które wcześniejsze tokeny są dla niego istotne, i miesza ich informację. Dzięki temu „był” w zdaniu wie, że chodzi o „kota”. W modelu decoder-only token widzi tylko tokeny wcześniejsze (maska przyczynowa).</li>
+<li><b>Feed-forward</b>: sieć przetwarza każdy token osobno. Tutaj w dużej mierze „zapisana” jest wiedza faktograficzna. Attention + MLP powtarzają się w dziesiątkach warstw.</li>
+<li>Ostatnia warstwa zamienia wektor ostatniego tokenu na <b>logity</b> — surowy wynik dla każdego z ~100k+ tokenów słownika.</li>
+<li><b>Softmax</b> zamienia logity w prawdopodobieństwa, a <b>sampling</b> (temperature, top-p) wybiera jeden token. Ten token wraca na wejście.</li>
+</ol>
+<p class="sdesc-cur out"></p>
+<div class="controls"><button class="btn secondary prev">◀</button><button class="btn next">Dalej ▶</button><button class="btn secondary auto">▶ Auto</button></div>
+</div>
+
+<h3>Attention — zobacz to</h3>
+<p>Kliknij dowolne słowo. Intensywność koloru pokazuje, ile „uwagi” ten token przydziela innym tokenom (uproszczona ilustracja jednej głowicy attention).</p>
+<div class="widget" data-widget="attention"><div class="w-title">Mapa uwagi</div><div class="att" style="display:flex;flex-wrap:wrap;gap:4px"></div><div class="out"></div></div>
+<div class="callout analogy"><span class="t">Analogia</span>Attention to jak czytanie zdania z zakreślaczem: przy słowie „był” wracasz wzrokiem do „Kot”, żeby wiedzieć, o kim mowa. Model ma dziesiątki takich „zakreślaczy” (głowic) w każdej warstwie, każdy wyspecjalizowany w innej relacji (składnia, odniesienia, temat).</div>
+<p><b>Koszt attention rośnie kwadratowo</b> z długością sekwencji (każdy token z każdym). Dlatego długi kontekst kosztuje i spowalnia, a dostawcy stosują optymalizacje (KV cache, sparse attention, prompt caching).</p>
+
+<h2>4. Jak model powstaje: etapy treningu</h2>
+<div class="flow"><span class="node">Pre-training</span><span class="arrow">→</span><span class="node">Instruction tuning (SFT)</span><span class="arrow">→</span><span class="node">Preference tuning (RLHF / RLAIF / DPO)</span><span class="arrow">→</span><span class="node">RL na rozumowaniu</span></div>
+<div class="grid">
+<div class="card"><h4>1. Pre-training</h4><p>Biliony tokenów z internetu, książek, kodu. Cel: przewidzieć następny token. Wynik: <b>model bazowy</b> — świetnie kontynuuje tekst, ale nie „słucha poleceń”.</p></div>
+<div class="card"><h4>2. SFT</h4><p>Dziesiątki/setki tysięcy par „polecenie → wzorcowa odpowiedź”. Model uczy się formatu rozmowy i wykonywania instrukcji.</p></div>
+<div class="card"><h4>3. Preferencje</h4><p>Ludzie (lub AI według zasad) oceniają, która z odpowiedzi jest lepsza. Model uczy się być pomocny, uczciwy i bezpieczny.</p></div>
+<div class="card"><h4>4. Rozumowanie</h4><p>RL na zadaniach z weryfikowalnym wynikiem (matematyka, kod). Model uczy się „myśleć” dłużej przed odpowiedzią — stąd <b>modele z trybem reasoning / extended thinking</b>.</p></div>
+</div>
+<div class="callout tip"><span class="t">Co z tego wynika dla Ciebie</span>
+<b>Knowledge cutoff</b>: model wie tylko to, co było w danych treningowych do pewnej daty. Wszystko nowsze lub prywatne (Twoja dokumentacja, stan zamówienia) trzeba dostarczyć w kontekście — przez RAG lub narzędzia. Fine-tuning też nie jest dobrym sposobem na „dodanie wiedzy” (moduł 14).</div>
+
+<h2>5. Sampling: temperature, top-k, top-p</h2>
+<p>Model zwraca rozkład. To, który token wybierzemy, kontrolują parametry samplingu. Pobaw się suwakami i obserwuj, jak zmienia się rozkład dla zdania „Najlepszym językiem do frontendu jest …”.</p>
+<div class="widget" data-widget="sampling">
+<div class="w-title">Symulator samplingu</div>
+<div class="row">
+<div><label>Temperature: <b class="tv"></b></label><input type="range" name="temp" min="0.01" max="2" step="0.01" value="1"></div>
+<div><label>Top-k: <b class="kv"></b></label><input type="range" name="topk" min="1" max="8" step="1" value="8"></div>
+<div><label>Top-p: <b class="pv"></b></label><input type="range" name="topp" min="0.1" max="1" step="0.01" value="1"></div>
+</div>
+<div class="bars" style="margin-top:10px"></div>
+<div class="controls"><button class="btn one">Losuj 1 token</button><button class="btn secondary many">Losuj 50×</button></div>
+<div class="out log" style="font-size:.9rem"></div>
+</div>
+<div class="table-wrap"><table>
+<tr><th>Parametr</th><th>Co robi</th><th>Kiedy używać</th></tr>
+<tr><td><b>temperature</b></td><td>Dzieli logity przez T przed softmaxem. T→0: prawie zawsze najbardziej prawdopodobny token (greedy). T&gt;1: rozkład spłaszczony, więcej „kreatywności” i błędów.</td><td>0–0.3: ekstrakcja, klasyfikacja, kod. 0.7–1.0: teksty kreatywne, burza mózgów.</td></tr>
+<tr><td><b>top-k</b></td><td>Losuj tylko spośród k najbardziej prawdopodobnych tokenów.</td><td>Rzadko ustawiany ręcznie w API komercyjnych.</td></tr>
+<tr><td><b>top-p</b> (nucleus)</td><td>Losuj z najmniejszego zbioru tokenów, których łączne prawdopodobieństwo ≥ p.</td><td>Alternatywa dla temperature. Zasada: zmieniaj <i>jedno</i> z dwóch, nie oba.</td></tr>
+<tr><td><b>max tokens</b></td><td>Twardy limit długości odpowiedzi. Po jego osiągnięciu odpowiedź zostaje ucięta (stop reason = limit).</td><td>Zawsze ustawiaj. Kontroluje koszt i chroni przed „gadulstwem”.</td></tr>
+<tr><td><b>stop sequences</b></td><td>Generowanie zatrzymuje się, gdy pojawi się dany ciąg.</td><td>Formaty z ogranicznikami, np. stop na <code>&lt;/answer&gt;</code>.</td></tr>
+</table></div>
+<div class="callout warn"><span class="t">Uwaga: temperature 0 ≠ pełny determinizm</span>Nawet przy T=0 dostawcy API nie gwarantują identycznych odpowiedzi (obliczenia GPU w różnej kolejności, batching, aktualizacje modelu). Nie projektuj systemu, który na tym polega — testy pisz na <b>własnościach</b> odpowiedzi, nie na dokładnym tekście. Część najnowszych modeli reasoning w ogóle nie przyjmuje parametru temperature.</div>
+
+<h2>6. Okno kontekstowe</h2>
+<p><b>Okno kontekstowe</b> (context window) to maksymalna liczba tokenów, jaką model przetworzy w jednym wywołaniu — wejście <i>i</i> wyjście razem. Dzisiejsze modele mają od ~128 tys. do ponad 1 mln tokenów. Ale „mieści się” nie znaczy „działa dobrze”.</p>
+<div class="widget" data-widget="ctxbudget">
+<div class="w-title">Budżet okna kontekstowego</div>
+<div class="row">
+<div><label>Limit okna (tys. tokenów)</label><input type="number" name="lim" value="200"></div>
+<div><label>System prompt</label><input type="number" name="sys" value="3000"></div>
+<div><label>Definicje narzędzi</label><input type="number" name="tools" value="6000"></div>
+</div><div class="row">
+<div><label>Historia rozmowy</label><input type="number" name="hist" value="40000"></div>
+<div><label>Dokumenty RAG</label><input type="number" name="docs" value="25000"></div>
+<div><label>Rezerwa na odpowiedź</label><input type="number" name="outp" value="8000"></div>
+</div>
+<div class="ctxbar" style="display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--surface-2);margin-top:12px"></div>
+<div class="out"></div>
+</div>
+<div class="grid">
+<div class="card"><h4>Context rot</h4><p>Jakość spada wraz z długością kontekstu: model gorzej wyciąga szczegóły ze środka długiego tekstu („lost in the middle”) i łatwiej się rozprasza nieistotnymi informacjami.</p></div>
+<div class="card"><h4>Koszt</h4><p>Płacisz za każdy token wejścia przy <i>każdym</i> wywołaniu. Rozmowa o 30 turach wysyła całą historię 30 razy.</p></div>
+<div class="card"><h4>Strategie</h4><p>Streszczanie starej historii, przycinanie wyników narzędzi, RAG zamiast „wrzuć wszystko”, prompt caching dla stałego prefiksu.</p></div>
+</div>
+
+<h2>7. Halucynacje</h2>
+<p><b>Halucynacja</b> to odpowiedź brzmiąca wiarygodnie, ale fałszywa. Wynika wprost z mechaniki: model generuje prawdopodobny tekst, a nie „sprawdza fakty”. Nie ma wbudowanej wiedzy, czego nie wie.</p>
+<div class="table-wrap"><table>
+<tr><th>Przyczyna</th><th>Przeciwdziałanie</th></tr>
+<tr><td>Brak wiedzy (cutoff, dane prywatne)</td><td>RAG / narzędzia dostarczające aktualnych danych</td></tr>
+<tr><td>Pytanie wymusza odpowiedź</td><td>Jawnie pozwól powiedzieć „nie wiem” / „brak w dokumentach”</td></tr>
+<tr><td>Szczegóły (cytaty, liczby, URL-e)</td><td>Każ cytować źródła z kontekstu i weryfikuj je programowo</td></tr>
+<tr><td>Długie, złożone zadanie</td><td>Podział na kroki, rozumowanie przed odpowiedzią, weryfikacja drugim wywołaniem</td></tr>
+<tr><td>Obliczenia</td><td>Narzędzie: kalkulator, wykonanie kodu, zapytanie SQL</td></tr>
+</table></div>
+
+<h2>8. Modele rozumujące (reasoning)</h2>
+<p>Część modeli potrafi przed odpowiedzią wygenerować wewnętrzny tok rozumowania (thinking / reasoning tokens). Wydłuża to czas i koszt, ale wyraźnie poprawia wyniki w zadaniach wieloetapowych: matematyka, programowanie, planowanie, analiza. W API zwykle sterujesz tym parametrem typu <code>effort</code> lub budżetem tokenów na myślenie.</p>
+<div class="vs">
+<div class="card"><h4>Włącz rozumowanie</h4><p>Debugowanie, złożona logika, analiza wielu dokumentów, planowanie agenta, trudne klasyfikacje z wieloma regułami.</p></div>
+<div class="card"><h4>Wyłącz / minimalne</h4><p>Proste ekstrakcje, czat small-talk, autouzupełnianie, wszystko, gdzie liczy się latencja &lt; 1 s.</p></div>
+</div>
+
+<div class="quiz" data-answer="1"><div class="q">Twoja aplikacja klasyfikuje zgłoszenia do 5 kategorii i czasem zwraca różne kategorie dla tego samego zgłoszenia. Co zrobić najpierw?</div>
+<button class="opt">Podnieść temperature do 1.2, żeby model „lepiej myślał”</button>
+<button class="opt">Obniżyć temperature (np. 0), doprecyzować definicje kategorii w prompcie i dodać przykłady granicznych przypadków</button>
+<button class="opt">Zwiększyć max tokens</button>
+<button class="opt">Przejść na model z większym oknem kontekstowym</button>
+<div class="expl">Niska temperatura zmniejsza losowość, a precyzyjne definicje i przykłady usuwają przyczynę — niejednoznaczność zadania. Pełnego determinizmu i tak nie dostaniesz, więc mierz spójność evalami.</div></div>
+<div class="quiz" data-answer="3"><div class="q">Dlaczego tokeny wyjściowe są droższe od wejściowych?</div>
+<button class="opt">Bo są dłuższe</button>
+<button class="opt">Bo dostawcy tak zdecydowali marketingowo</button>
+<button class="opt">Bo wyjście jest zapisywane na dysku</button>
+<button class="opt">Bo wejście przetwarzane jest równolegle w jednym przebiegu, a każdy token wyjścia wymaga osobnego, sekwencyjnego przebiegu modelu</button>
+<div class="expl">Generowanie jest autoregresywne — to sekwencyjny, kosztowny proces, w przeciwieństwie do równoległego przetwarzania promptu.</div></div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Dwie funkcje, które w praktyce piszesz albo debugujesz w każdej aplikacji czatowej: rozkład prawdopodobieństwa po samplingu i przycinanie historii do okna kontekstowego.</p>
+<div data-kata="m02-sampling"></div>
+<div data-kata="m02-trim-history"></div>
+</section>

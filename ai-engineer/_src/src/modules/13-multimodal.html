@@ -1,0 +1,158 @@
+<section class="module" id="m13" data-num="13" data-title="Multimodalność">
+<div class="module-head"><div class="kicker">Moduł 13 · Zmysły</div><h1>Multimodalność: obraz, dokumenty, audio, wideo</h1>
+<p>Modele, które widzą, słyszą i mówią. Analiza zdjęć i PDF-ów, generowanie obrazów, transkrypcja, synteza mowy, agenci głosowi i wyszukiwanie obrazów tekstem.</p>
+<div class="goals"><span>vision i PDF</span><span>generowanie obrazów</span><span>STT / TTS</span><span>agent głosowy</span><span>embeddingi multimodalne</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> Obraz w API to po prostu kolejny blok treści w wiadomości (obok tekstu) — kosztuje tokeny zależnie od rozdzielczości. Do generowania obrazów, transkrypcji i mowy używa się zwykle osobnych, wyspecjalizowanych modeli i endpointów.</div>
+
+<h2>Mapa modalności</h2>
+<div class="table-wrap"><table>
+<tr><th>Zadanie</th><th>Wejście → wyjście</th><th>Typowe narzędzia</th><th>Zastosowania</th></tr>
+<tr><td>Vision</td><td>obraz + tekst → tekst</td><td>Claude, GPT, Gemini</td><td>OCR paragonów, analiza zrzutów ekranu, kontrola jakości, alt-texty</td></tr>
+<tr><td>Dokumenty</td><td>PDF → tekst</td><td>Claude, GPT, Gemini (natywnie)</td><td>Umowy, faktury, raporty z wykresami</td></tr>
+<tr><td>Generowanie obrazów</td><td>tekst (+obraz) → obraz</td><td>GPT Image, Imagen, Flux, Stable Diffusion</td><td>Grafiki marketingowe, warianty produktów, edycja</td></tr>
+<tr><td>Speech-to-text</td><td>audio → tekst</td><td>modele transkrypcji OpenAI, Whisper (open-source), Deepgram</td><td>Notatki ze spotkań, napisy, call center</td></tr>
+<tr><td>Text-to-speech</td><td>tekst → audio</td><td>modele TTS OpenAI, ElevenLabs</td><td>Lektor, asystent głosowy, dostępność</td></tr>
+<tr><td>Speech-to-speech</td><td>audio → audio (realtime)</td><td>Realtime API, Gemini Live</td><td>Agent głosowy z niską latencją</td></tr>
+<tr><td>Wideo</td><td>wideo → tekst / tekst → wideo</td><td>Gemini (rozumienie), Sora, Veo (generowanie)</td><td>Analiza nagrań, krótkie formy wideo</td></tr>
+</table></div>
+
+<h2>Vision: model analizuje obraz</h2>
+<code-block lang="typescript" file="src/vision-receipt.ts">
+import Anthropic from "@anthropic-ai/sdk";
+import { readFile } from "node:fs/promises";
+const client = new Anthropic();
+
+const image = (await readFile("paragon.jpg")).toString("base64");
+
+const res = await client.messages.create({
+  model: "claude-sonnet-5-5",
+  max_tokens: 1500,
+  messages: [{
+    role: "user",
+    content: [
+      // obraz PRZED pytaniem — zwykle daje lepsze wyniki
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: image } },
+      { type: "text", text: `Odczytaj paragon. Zwróć JSON: { sklep, data (YYYY-MM-DD), pozycje: [{nazwa, cena}], suma }.
+Jeśli coś jest nieczytelne, wpisz null — nie zgaduj.` },
+    ],
+  }],
+});
+console.log(res.content[0].type === "text" ? res.content[0].text : "");
+</code-block>
+<div class="grid">
+<div class="card"><h4>Koszt obrazu</h4><p>Obraz zamieniany jest na tokeny proporcjonalnie do liczby pikseli (w Claude orientacyjnie szerokość × wysokość / 750). Zdjęcie 1000×1000 ≈ 1300 tokenów. Duże obrazy są skalowane w dół.</p></div>
+<div class="card"><h4>Jakość</h4><p>Przytnij do istotnego fragmentu, zadbaj o czytelność tekstu. Mały, rozmazany tekst to główne źródło błędów OCR.</p></div>
+<div class="card"><h4>Ograniczenia</h4><p>Precyzyjne liczenie obiektów, dokładne położenie przestrzenne i bardzo drobne detale bywają zawodne. Weryfikuj krytyczne dane.</p></div>
+</div>
+
+<h3>PDF bezpośrednio do modelu</h3>
+<code-block lang="typescript" file="src/pdf-analyze.ts">
+const pdf = (await readFile("umowa.pdf")).toString("base64");
+const res = await client.messages.create({
+  model: "claude-sonnet-5-5",
+  max_tokens: 3000,
+  messages: [{
+    role: "user",
+    content: [
+      { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdf } },
+      { type: "text", text: "Wypisz strony umowy, okres wypowiedzenia i kary umowne. Podaj numer strony dla każdej informacji." },
+    ],
+  }],
+});
+</code-block>
+<p>Model widzi zarówno tekst, jak i wyrenderowane strony — rozumie tabele, wykresy i skany. Dla dużych zbiorów dokumentów nadal lepszy jest RAG (moduł 10), ewentualnie z multimodalnym parsowaniem przy indeksowaniu.</p>
+
+<h2>Generowanie obrazów</h2>
+<figure>
+<svg viewBox="0 0 680 150">
+<g font-size="12" text-anchor="middle">
+<defs><filter id="noise13"><feTurbulence baseFrequency="0.9" numOctaves="2"/><feColorMatrix type="saturate" values="0"/></filter></defs>
+<rect x="20" y="20" width="100" height="100" rx="8" filter="url(#noise13)"/>
+<rect x="160" y="20" width="100" height="100" rx="8" filter="url(#noise13)" opacity=".7"/><circle cx="210" cy="70" r="30" fill="var(--c5)" opacity=".4"/>
+<rect x="300" y="20" width="100" height="100" rx="8" filter="url(#noise13)" opacity=".35"/><circle cx="350" cy="70" r="30" fill="var(--c5)" opacity=".75"/>
+<rect x="440" y="20" width="100" height="100" rx="8" fill="var(--c6)" opacity=".35"/><circle cx="490" cy="70" r="30" fill="var(--c5)"/><rect x="440" y="95" width="100" height="25" fill="var(--c3)" opacity=".6"/>
+<text x="70" y="140" class="svg-muted">szum</text><text x="210" y="140" class="svg-muted">krok 10</text><text x="350" y="140" class="svg-muted">krok 30</text><text x="490" y="140" class="svg-muted">obraz</text>
+<text x="610" y="65" class="svg-text" font-weight="700">„zachód słońca</text><text x="610" y="82" class="svg-text" font-weight="700">nad łąką”</text>
+<g stroke="var(--muted)" stroke-width="1.5"><path d="M122 70H158M262 70H298M402 70H438"/></g>
+</g>
+</svg>
+<figcaption>Modele dyfuzyjne uczą się usuwać szum: zaczynają od losowego szumu i w wielu krokach „odszumiają” go w kierunku obrazu pasującego do opisu. Część nowszych modeli generuje obrazy autoregresywnie, podobnie jak tekst.</figcaption>
+</figure>
+<code-block lang="typescript" file="src/image-gen.ts">
+import OpenAI from "openai";
+import { writeFile } from "node:fs/promises";
+const openai = new OpenAI();
+
+const img = await openai.images.generate({
+  model: "gpt-image-2", // przykładowe ID — sprawdź aktualną listę modeli obrazowych
+  prompt: "Zdjęcie produktowe ręcznie robionego ceramicznego kubka w kolorze butelkowej zieleni, " +
+          "na drewnianym stole, miękkie poranne światło, płytka głębia ostrości, bez tekstu",
+  size: "1024x1024",
+});
+await writeFile("kubek.png", Buffer.from(img.data![0].b64_json!, "base64"));
+</code-block>
+<div class="callout tip"><span class="t">Prompt do obrazu</span>Opisuj: obiekt, otoczenie, oświetlenie, styl/medium (zdjęcie, akwarela, ilustracja wektorowa), kompozycję i kadr, czego ma nie być. Pamiętaj o prawach: nie generuj znaków towarowych, postaci chronionych ani wizerunków prawdziwych osób.</div>
+
+<h2>Audio: mowa ↔ tekst</h2>
+<code-block lang="typescript" file="src/audio.ts">
+import OpenAI from "openai";
+import fs from "node:fs";
+const openai = new OpenAI();
+
+// Speech-to-text
+const transcript = await openai.audio.transcriptions.create({
+  file: fs.createReadStream("spotkanie.mp3"),
+  model: "gpt-transcribe", // przykładowe ID; open-source alternatywa: Whisper lokalnie
+  language: "pl",          // podpowiedź języka poprawia dokładność
+});
+console.log(transcript.text);
+
+// Text-to-speech
+const speech = await openai.audio.speech.create({
+  model: "gpt-4o-mini-tts",
+  voice: "alloy",
+  input: "Twoje zamówienie zostało wysłane i dotrze jutro.",
+});
+fs.writeFileSync("odpowiedz.mp3", Buffer.from(await speech.arrayBuffer()));
+</code-block>
+<h3>Architektury agenta głosowego</h3>
+<div class="vs">
+<div class="card"><h4>Kaskada: STT → LLM → TTS</h4><div class="flow" style="margin:.5em 0"><span class="node">🎤 STT</span><span class="arrow">→</span><span class="node">🧠 LLM + narzędzia</span><span class="arrow">→</span><span class="node">🔊 TTS</span></div><p>Pełna kontrola, dowolny LLM, łatwe logowanie tekstu. Latencja sumuje się (zwykle 1–3 s). Streamuj każdy etap.</p></div>
+<div class="card"><h4>Speech-to-speech (realtime)</h4><div class="flow" style="margin:.5em 0"><span class="node">🎤 audio</span><span class="arrow">→</span><span class="node">🧠 model audio</span><span class="arrow">→</span><span class="node">🔊 audio</span></div><p>Najniższa latencja, naturalna intonacja, obsługa przerywania. Mniej kontroli, połączenie przez WebSocket/WebRTC.</p></div>
+</div>
+<p>W rozmowie głosowej kluczowe są: wykrywanie końca wypowiedzi (VAD), obsługa przerwania (użytkownik zaczyna mówić, gdy agent mówi), krótkie odpowiedzi i brak formatowania (nie da się przeczytać tabeli).</p>
+
+<h2>Wideo</h2>
+<p><b>Rozumienie</b>: modele natywnie obsługujące wideo przyjmują plik bezpośrednio. Uniwersalna metoda dla innych: wytnij klatki (np. 1 na sekundę, ffmpeg), wyślij je jako serię obrazów + transkrypcję audio. <b>Generowanie</b>: modele tekst→wideo tworzą krótkie klipy; są drogie i wolne, w aplikacjach zwykle obsługiwane asynchronicznie (zadanie w tle + webhook/polling).</p>
+
+<h2>Embeddingi multimodalne</h2>
+<p>Modele typu CLIP umieszczają obrazy i teksty w <b>tej samej przestrzeni</b>. Możesz wyszukiwać zdjęcia opisem tekstowym albo znajdować podobne produkty po zdjęciu.</p>
+<code-block lang="python" file="image_search.py">
+from sentence_transformers import SentenceTransformer
+from PIL import Image
+import glob
+
+model = SentenceTransformer("clip-ViT-B-32")  # wersja wielojęzyczna: "clip-ViT-B-32-multilingual-v1" (dla tekstu)
+
+paths = glob.glob("produkty/*.jpg")
+img_emb = model.encode([Image.open(p) for p in paths], normalize_embeddings=True)
+
+query = model.encode(["red sneakers on white background"], normalize_embeddings=True)
+scores = (query @ img_emb.T)[0]
+for i in scores.argsort()[::-1][:5]:
+    print(f"{scores[i]:.3f}  {paths[i]}")
+</code-block>
+
+<div class="quiz" data-answer="0"><div class="q">Budujesz asystenta telefonicznego dla przychodni. Najważniejsza jest naturalność i krótki czas reakcji, ale musisz też logować treść rozmów i wywoływać system rezerwacji. Co rozważysz?</div>
+<button class="opt">Model speech-to-speech (realtime) z tool callingiem i równoległą transkrypcją do logów — albo kaskadę z pełnym streamingiem, jeśli potrzebna jest większa kontrola</button>
+<button class="opt">Nagrywanie całej wypowiedzi, wysyłka mailem i odpowiedź następnego dnia</button>
+<button class="opt">Generowanie wideo z odpowiedzią</button>
+<button class="opt">Model obrazowy, bo jest najszybszy</button>
+<div class="expl">Obie architektury głosowe są realne — wybór to trade-off między latencją/naturalnością (realtime) a kontrolą i dowolnością modelu (kaskada). Ważne, że obie obsługują narzędzia i logowanie.</div></div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Ekstrakcja danych ze zdjęcia z kontrolą poprawności, a do tego rachunek: ile tokenów kosztuje obraz i jak go przeskalować.</p>
+<div data-lab="vision"></div>
+<div data-kata="m13-image-tokens"></div>
+</section>

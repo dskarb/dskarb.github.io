@@ -1,0 +1,86 @@
+<section class="module" id="m01" data-num="01" data-title="Kim jest AI Engineer">
+<div class="module-head"><div class="kicker">Moduł 01 · Wprowadzenie</div><h1>Kim jest AI Engineer</h1>
+<p>Rola, zakres odpowiedzialności, różnice względem ML Engineera i to, z czego składa się typowa aplikacja AI.</p>
+<div class="goals"><span>rozróżnisz role w AI</span><span>poznasz warstwy aplikacji LLM</span><span>wiesz, kiedy NIE używać AI</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> AI Engineer = software engineer + rozumienie modeli. Bierze gotowy model (przez API lub open-source), dokłada dane, narzędzia, kontrolę jakości i bezpieczeństwa, i dowozi działającą funkcję produktu.</div>
+
+<h2>Role w świecie AI</h2>
+<div class="table-wrap"><table>
+<tr><th>Rola</th><th>Główne pytanie</th><th>Typowa praca</th><th>Narzędzia</th></tr>
+<tr><td><b>AI Researcher</b></td><td>Jak zbudować lepszy model?</td><td>Nowe architektury, publikacje, eksperymenty na ogromną skalę</td><td>PyTorch, JAX, klastry GPU</td></tr>
+<tr><td><b>ML Engineer</b></td><td>Jak wytrenować i wdrożyć model na naszych danych?</td><td>Pipeline'y danych, trening, feature engineering, serving modeli</td><td>PyTorch, scikit-learn, MLflow, Kubeflow</td></tr>
+<tr><td><b>Data Scientist</b></td><td>Co mówią dane?</td><td>Analizy, modele statystyczne, eksperymenty A/B</td><td>Python, SQL, pandas, notebooks</td></tr>
+<tr style="background:var(--accent-soft)"><td><b>AI Engineer</b></td><td>Jak zbudować produkt z gotowych modeli?</td><td>Integracje LLM, RAG, agenci, ewaluacja, koszty, UX AI</td><td>SDK dostawców, wektorowe DB, TypeScript/Python, evals</td></tr>
+</table></div>
+
+<div class="callout analogy"><span class="t">Analogia</span>
+ML Engineer projektuje i buduje silnik. AI Engineer bierze gotowy silnik (np. model Claude, GPT czy Llama) i projektuje cały samochód: skrzynię biegów (orkiestracja), deskę rozdzielczą (UX), czujniki (ewaluacja, monitoring) i hamulce (guardrails).</div>
+
+<h2>Co AI Engineer faktycznie robi</h2>
+<div class="grid">
+  <div class="card"><h4>🧩 Integruje modele</h4><p>Wybiera model pod zadanie, obsługuje API, streaming, retry, limity, koszty.</p></div>
+  <div class="card"><h4>📚 Podłącza wiedzę</h4><p>Buduje RAG: chunking dokumentów, embeddingi, wyszukiwanie, cytowania źródeł.</p></div>
+  <div class="card"><h4>🛠️ Daje modelowi narzędzia</h4><p>Tool calling, agenci, serwery MCP — model wykonuje akcje w systemach.</p></div>
+  <div class="card"><h4>📏 Mierzy jakość</h4><p>Zestawy testowe (evals), LLM-as-judge, regresje po zmianie promptu lub modelu.</p></div>
+  <div class="card"><h4>🛡️ Zabezpiecza</h4><p>Prompt injection, wycieki danych, moderacja, PII, uprawnienia narzędzi.</p></div>
+  <div class="card"><h4>📈 Utrzymuje na produkcji</h4><p>Tracing, monitoring kosztów i latencji, cache, fallbacki, wersjonowanie promptów.</p></div>
+</div>
+
+<h2>Anatomia aplikacji opartej o LLM</h2>
+<p>Praktycznie każda aplikacja AI, którą zbudujesz, składa się z tych samych warstw. Kliknij <b>▶ Auto</b> albo przechodź krokami, żeby zobaczyć, jak przepływa jedno zapytanie użytkownika.</p>
+<div class="widget" data-widget="svgstep">
+<div class="w-title">Przepływ zapytania przez warstwy aplikacji</div>
+<svg viewBox="0 0 700 330" style="width:100%">
+  <g font-size="13" font-weight="600">
+  <g data-s="1 7"><rect x="250" y="8" width="200" height="40" rx="10" fill="var(--accent-soft)" stroke="var(--c1)"/><text x="350" y="33" text-anchor="middle" class="svg-text">UI / klient (React)</text></g>
+  <g data-s="2 6"><rect x="250" y="78" width="200" height="40" rx="10" class="svg-box" stroke="var(--c4)"/><text x="350" y="103" text-anchor="middle" class="svg-text">Backend / API route</text></g>
+  <g data-s="2"><rect x="20" y="78" width="180" height="40" rx="10" class="svg-box" stroke="var(--c5)"/><text x="110" y="103" text-anchor="middle" class="svg-text">Guardrails wejścia</text></g>
+  <g data-s="3"><rect x="250" y="148" width="200" height="40" rx="10" class="svg-box" stroke="var(--c3)"/><text x="350" y="173" text-anchor="middle" class="svg-text">Orkiestracja / kontekst</text></g>
+  <g data-s="3"><rect x="20" y="148" width="180" height="40" rx="10" class="svg-box" stroke="var(--c3)"/><text x="110" y="173" text-anchor="middle" class="svg-text">Retrieval (RAG)</text></g>
+  <g data-s="3"><rect x="500" y="148" width="180" height="40" rx="10" class="svg-box" stroke="var(--c3)"/><text x="590" y="173" text-anchor="middle" class="svg-text">Pamięć / historia</text></g>
+  <g data-s="4 5"><rect x="250" y="218" width="200" height="40" rx="10" fill="var(--warn-soft)" stroke="var(--c2)"/><text x="350" y="243" text-anchor="middle" class="svg-text">LLM (API / lokalny)</text></g>
+  <g data-s="5"><rect x="500" y="218" width="180" height="40" rx="10" class="svg-box" stroke="var(--c2)"/><text x="590" y="243" text-anchor="middle" class="svg-text">Narzędzia / MCP</text></g>
+  <g data-s="6"><rect x="20" y="218" width="180" height="40" rx="10" class="svg-box" stroke="var(--c5)"/><text x="110" y="243" text-anchor="middle" class="svg-text">Guardrails wyjścia</text></g>
+  <g data-s="1 2 3 4 5 6 7"><rect x="20" y="285" width="660" height="36" rx="10" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="350" y="308" text-anchor="middle" class="svg-text">Observability: tracing · koszty · latencja · evals</text></g>
+  </g>
+  <g class="svg-line" stroke-width="1.5"><path d="M350 48V78"/><path d="M350 118V148"/><path d="M350 188V218"/><path d="M200 98H250"/><path d="M200 168H250"/><path d="M450 168H500"/><path d="M450 238H500"/><path d="M200 238H250"/></g>
+</svg>
+<ol class="sdesc" hidden>
+<li>Użytkownik wpisuje pytanie w UI. Odpowiedź będzie streamowana token po tokenie — UI musi to obsłużyć.</li>
+<li>Backend przyjmuje żądanie (nigdy nie wołaj API LLM z przeglądarki — wyciekłby klucz). Guardrails wejścia: limity długości, moderacja, wykrywanie prompt injection, rate limiting per użytkownik.</li>
+<li>Warstwa orkiestracji buduje <b>kontekst</b>: system prompt + historia rozmowy + dokumenty z RAG + definicje narzędzi. To tutaj dzieje się większość „inżynierii AI”.</li>
+<li>Kontekst trafia do modelu. Model generuje odpowiedź albo prosi o wywołanie narzędzia.</li>
+<li>Jeśli model poprosił o narzędzie (np. „sprawdź status zamówienia”), backend je wykonuje i odsyła wynik do modelu. Ta pętla to właśnie agent.</li>
+<li>Guardrails wyjścia: walidacja formatu (np. JSON zgodny ze schematem), filtrowanie PII, sprawdzenie, czy odpowiedź cytuje źródła.</li>
+<li>Odpowiedź wraca do UI. Każdy krok był zalogowany w systemie observability, więc możesz policzyć koszt, czas i jakość.</li>
+</ol>
+<p class="sdesc-cur out"></p>
+<div class="controls"><button class="btn secondary prev">◀</button><button class="btn next">Dalej ▶</button><button class="btn secondary auto">▶ Auto</button></div>
+</div>
+
+<h2>Kiedy NIE używać LLM</h2>
+<p>Dojrzały AI Engineer często mówi „tu nie potrzebujemy modelu”. LLM jest drogi, wolny (setki ms – sekundy), niedeterministyczny i może się mylić. Klasyczny kod wygrywa, gdy:</p>
+<div class="vs">
+<div class="card"><h4>❌ Zły kandydat</h4><p>Walidacja e-maila, obliczenia finansowe, sortowanie, reguły biznesowe z jasną specyfikacją, wszystko, co wymaga 100% powtarzalności, operacje wymagające &lt;50 ms.</p></div>
+<div class="card"><h4>✅ Dobry kandydat</h4><p>Rozumienie języka naturalnego, streszczanie, ekstrakcja danych z nieustrukturyzowanego tekstu, klasyfikacja z niejasnymi granicami, generowanie treści, wyszukiwanie semantyczne, asystenci.</p></div>
+</div>
+<div class="callout tip"><span class="t">Reguła kciuka</span>Jeśli potrafisz napisać test jednostkowy z jednym poprawnym wynikiem i prostą funkcją, która go zawsze przechodzi — napisz funkcję. LLM ma sens tam, gdzie „poprawnych” odpowiedzi jest wiele, a reguły trudno spisać.</div>
+
+<h2>Mapa kompetencji</h2>
+<div class="table-wrap"><table>
+<tr><th>Obszar</th><th>Poziom junior</th><th>Poziom samodzielny (cel kompendium)</th></tr>
+<tr><td>API LLM</td><td>Wysyła prompt, odbiera tekst</td><td>Streaming, structured output, tool calling, retry, prompt caching, kontrola kosztów</td></tr>
+<tr><td>Prompting</td><td>Pisze polecenia metodą prób i błędów</td><td>Projektuje kontekst, wersjonuje prompty, mierzy efekt zmian evalami</td></tr>
+<tr><td>RAG</td><td>Wrzuca dokumenty do gotowego narzędzia</td><td>Dobiera chunking, hybrid search, reranking, mierzy recall i faithfulness</td></tr>
+<tr><td>Agenci</td><td>Używa frameworka z tutorialu</td><td>Pisze pętlę agenta od zera, projektuje narzędzia, ogranicza uprawnienia, obsługuje błędy</td></tr>
+<tr><td>Produkcja</td><td>—</td><td>Tracing, evals w CI, budżety kosztów, fallback między modelami, bezpieczeństwo</td></tr>
+</table></div>
+
+<div class="quiz" data-answer="2"><div class="q">Firma chce chatbota odpowiadającego na pytania o jej wewnętrzną dokumentację. Co jest typowym zadaniem AI Engineera w tym projekcie?</div>
+<button class="opt">Wytrenowanie od zera własnego modelu językowego na dokumentacji</button>
+<button class="opt">Zaprojektowanie nowej architektury transformera</button>
+<button class="opt">Zbudowanie RAG na gotowym modelu: indeksowanie dokumentów, wyszukiwanie, prompt z kontekstem i ewaluacja odpowiedzi</button>
+<button class="opt">Ręczne pisanie odpowiedzi na najczęstsze pytania</button>
+<div class="expl">AI Engineer korzysta z modeli pre-trenowanych. Trening od zera to praca badawcza/ML i byłby wielokrotnie droższy oraz gorszy od RAG na gotowym modelu.</div></div>
+</section>

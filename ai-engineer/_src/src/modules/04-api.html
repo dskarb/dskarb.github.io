@@ -1,0 +1,369 @@
+<section class="module" id="m04" data-num="04" data-title="Praca z API LLM">
+<div class="module-head"><div class="kicker">Moduł 04 · Fundamenty</div><h1>Praca z API modeli językowych</h1>
+<p>Pierwsze wywołanie, rozmowa wieloturowa, streaming do UI, structured output, obsługa błędów, liczenie tokenów i kosztów, cache i batch.</p>
+<div class="goals"><span>Messages API</span><span>streaming w Next.js</span><span>JSON ze schematem</span><span>retry i limity</span><span>kalkulacja kosztów</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> API LLM jest <b>bezstanowe</b>: przy każdym wywołaniu wysyłasz cały kontekst (system prompt + historię wiadomości). Dostajesz odpowiedź, powód zatrzymania (stop reason) i zużycie tokenów. Cała reszta to dobra inżynieria wokół tego jednego wywołania.</div>
+
+<h2>Anatomia żądania</h2>
+<figure>
+<svg viewBox="0 0 680 260">
+<g font-size="12.5">
+<rect x="10" y="10" width="660" height="240" rx="12" fill="none" stroke="var(--line)"/>
+<text x="24" y="34" font-weight="700" class="svg-text">POST /v1/messages</text>
+<rect x="24" y="46" width="300" height="36" rx="8" fill="var(--accent-soft)" stroke="var(--c1)"/><text x="36" y="69" class="svg-text"><tspan font-weight="700">model</tspan> · max_tokens · temperature</text>
+<rect x="24" y="92" width="300" height="36" rx="8" class="svg-box" stroke="var(--c4)"/><text x="36" y="115" class="svg-text"><tspan font-weight="700">system</tspan>: rola, zasady, format</text>
+<rect x="24" y="138" width="300" height="100" rx="8" class="svg-box" stroke="var(--c6)"/><text x="36" y="158" font-weight="700" class="svg-text">messages</text>
+<rect x="40" y="166" width="200" height="20" rx="5" fill="var(--c1)" opacity=".25"/><text x="48" y="181" class="svg-text" font-size="11.5">user: „Cześć, mam pytanie…”</text>
+<rect x="80" y="190" width="200" height="20" rx="5" fill="var(--c3)" opacity=".25"/><text x="88" y="205" class="svg-text" font-size="11.5">assistant: „Jasne, słucham.”</text>
+<rect x="40" y="214" width="200" height="20" rx="5" fill="var(--c1)" opacity=".25"/><text x="48" y="229" class="svg-text" font-size="11.5">user: „Ile kosztuje…?”</text>
+<rect x="350" y="46" width="300" height="36" rx="8" class="svg-box" stroke="var(--c2)"/><text x="362" y="69" class="svg-text"><tspan font-weight="700">tools</tspan> (opcjonalnie): definicje narzędzi</text>
+<text x="350" y="112" font-weight="700" class="svg-text">Odpowiedź:</text>
+<rect x="350" y="122" width="300" height="116" rx="8" fill="var(--ok-soft)" stroke="var(--ok)"/>
+<text x="362" y="144" class="svg-text">content: [ {type:"text", text:"…"} ]</text>
+<text x="362" y="168" class="svg-text">stop_reason: "end_turn"</text>
+<text x="362" y="192" class="svg-text">usage: { input_tokens: 812,</text>
+<text x="362" y="210" class="svg-text">         output_tokens: 143 }</text>
+</g>
+</svg>
+<figcaption>Role w rozmowie: <b>system</b> (instrukcje od dewelopera), <b>user</b> (użytkownik), <b>assistant</b> (model). Wiadomości user/assistant naprzemiennie. Ostatnia wiadomość to zwykle user.</figcaption>
+</figure>
+
+<h2>Pierwsze wywołanie</h2>
+<code-block lang="typescript" file="src/01-hello-anthropic.ts">
+import "dotenv/config";
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic(); // czyta ANTHROPIC_API_KEY z env
+
+const msg = await client.messages.create({
+  model: "claude-sonnet-5-5",
+  max_tokens: 1024,
+  system: "Jesteś zwięzłym asystentem dla programistów. Odpowiadaj po polsku.",
+  messages: [{ role: "user", content: "Czym różni się let od const w JS? 2 zdania." }],
+});
+
+// content to tablica bloków (tekst, wywołania narzędzi, myślenie...)
+for (const block of msg.content) {
+  if (block.type === "text") console.log(block.text);
+}
+console.log(msg.stop_reason, msg.usage); // "end_turn" { input_tokens, output_tokens, ... }
+</code-block>
+<code-block lang="typescript" file="src/01-hello-openai.ts">
+import "dotenv/config";
+import OpenAI from "openai";
+
+const client = new OpenAI(); // czyta OPENAI_API_KEY
+
+// Responses API — nowszy interfejs OpenAI
+const res = await client.responses.create({
+  model: "gpt-5.6-terra", // przykładowe ID — sprawdź aktualną listę modeli
+  instructions: "Jesteś zwięzłym asystentem dla programistów. Odpowiadaj po polsku.",
+  input: "Czym różni się let od const w JS? 2 zdania.",
+  max_output_tokens: 1024,
+});
+console.log(res.output_text);
+console.log(res.usage); // { input_tokens, output_tokens, ... }
+
+// Starszy, wciąż szeroko używany (i kopiowany przez innych dostawców) format:
+const chat = await client.chat.completions.create({
+  model: "gpt-5.6-terra",
+  messages: [
+    { role: "system", content: "Odpowiadaj po polsku." },
+    { role: "user", content: "Czym jest closure?" },
+  ],
+});
+console.log(chat.choices[0].message.content);
+</code-block>
+<div class="callout"><span class="t">Format „OpenAI-compatible”</span>Wiele narzędzi (Ollama, vLLM, Groq, OpenRouter, Together) udostępnia endpoint zgodny z <code>/v1/chat/completions</code>. W praktyce: ten sam SDK OpenAI + inny <code>baseURL</code> i klucz. Warto to znać, bo pozwala zmienić dostawcę jedną linijką.</div>
+
+<h2>Rozmowa wieloturowa — Ty trzymasz stan</h2>
+<code-block lang="typescript" file="src/02-chat.ts">
+import Anthropic from "@anthropic-ai/sdk";
+import * as readline from "node:readline/promises";
+
+const client = new Anthropic();
+const history: Anthropic.MessageParam[] = [];
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+while (true) {
+  const text = await rl.question("Ty: ");
+  if (text === "exit") break;
+  history.push({ role: "user", content: text });
+
+  const res = await client.messages.create({
+    model: "claude-haiku-5-5",
+    max_tokens: 800,
+    system: "Jesteś pomocnym asystentem.",
+    messages: history, // CAŁA historia przy każdym wywołaniu
+  });
+  const answer = res.content.filter(b => b.type === "text").map(b => b.text).join("");
+  history.push({ role: "assistant", content: answer });
+  console.log("AI:", answer, `\n[in: ${res.usage.input_tokens}, out: ${res.usage.output_tokens}]`);
+}
+rl.close();
+</code-block>
+<p>Uruchom to i obserwuj <code>input_tokens</code> — rośnie z każdą turą. To jest powód, dla którego długie rozmowy są drogie i trzeba nimi zarządzać (streszczanie, przycinanie, prompt caching).</p>
+
+<h2>Streaming — tekst pojawia się na bieżąco</h2>
+<p>Odpowiedź z 500 tokenami generuje się kilka–kilkanaście sekund. Streaming pokazuje pierwsze słowa po ułamku sekundy — dla UX to różnica między „działa” a „zawiesiło się”. Technicznie API wysyła zdarzenia <b>Server-Sent Events</b>.</p>
+<code-block lang="typescript" file="app/api/chat/route.ts (Next.js App Router)">
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const stream = client.messages.stream({
+    model: "claude-sonnet-5-5",
+    max_tokens: 1500,
+    system: "Jesteś asystentem sklepu. Odpowiadaj krótko.",
+    messages,
+  });
+
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    async start(controller) {
+      stream.on("text", (delta) => controller.enqueue(encoder.encode(delta)));
+      try {
+        await stream.finalMessage(); // czeka do końca, rzuca przy błędzie
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+    cancel() { stream.abort(); }, // użytkownik zamknął kartę → przestań płacić za tokeny
+  });
+
+  return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+}
+</code-block>
+<code-block lang="tsx" file="components/Chat.tsx">
+"use client";
+import { useState } from "react";
+
+type Msg = { role: "user" | "assistant"; content: string };
+
+export function Chat() {
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function send() {
+    const next: Msg[] = [...messages, { role: "user", content: input }];
+    setMessages([...next, { role: "assistant", content: "" }]);
+    setInput(""); setLoading(true);
+
+    const res = await fetch("/api/chat", { method: "POST", body: JSON.stringify({ messages: next }) });
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      setMessages(m => {
+        const copy = [...m];
+        copy[copy.length - 1] = { ...copy[copy.length - 1], content: copy[copy.length - 1].content + chunk };
+        return copy;
+      });
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div>
+      {messages.map((m, i) => <p key={i}><b>{m.role}:</b> {m.content}</p>)}
+      <input value={input} onChange={e => setInput(e.target.value)} disabled={loading} />
+      <button onClick={send} disabled={loading || !input}>Wyślij</button>
+    </div>
+  );
+}
+</code-block>
+<div class="callout tip"><span class="t">W praktyce</span>W projektach React/Next.js często używa się <b>Vercel AI SDK</b> (paczka <code>ai</code> + adaptery dostawców), który daje gotowe hooki do czatu, streaming i ujednolicone API wielu modeli. Warto jednak raz napisać streaming ręcznie (jak wyżej), żeby rozumieć, co robi biblioteka — przy debugowaniu to się zwraca.</div>
+
+<h2>Structured output — JSON zamiast prozy</h2>
+<p>W aplikacjach rzadko chcesz luźny tekst. Chcesz obiekt, który zapiszesz w bazie lub wyświetlisz w UI. Trzy poziomy niezawodności:</p>
+<div class="grid">
+<div class="card"><h4>1. Prośba w prompcie</h4><p>„Zwróć JSON o polach…”. Działa często, ale nie zawsze (dodatkowy tekst, brakujące pola).</p><span class="pill warn">zawodne</span></div>
+<div class="card"><h4>2. Wymuszone narzędzie</h4><p>Definiujesz narzędzie z JSON Schema i wymuszasz jego użycie. Model zwraca argumenty zgodne ze schematem.</p><span class="pill ok">dobre</span></div>
+<div class="card"><h4>3. Constrained decoding</h4><p>Tryb „structured outputs / strict” — dostawca ogranicza sampling do tokenów zgodnych ze schematem.</p><span class="pill ok">najlepsze</span></div>
+</div>
+<p><b>Niezależnie od metody zawsze waliduj wynik</b> (np. Zodem) — schemat gwarantuje składnię, nie sensowność wartości.</p>
+<code-block lang="typescript" file="src/03-extract.ts">
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+
+const client = new Anthropic();
+
+const Invoice = z.object({
+  vendor: z.string(),
+  nip: z.string().regex(/^\d{10}$/).nullable(),
+  issueDate: z.string().describe("YYYY-MM-DD"),
+  totalGross: z.number(),
+  currency: z.enum(["PLN", "EUR", "USD"]),
+  items: z.array(z.object({ name: z.string(), qty: z.number(), unitNet: z.number() })),
+});
+
+// zod v4: schemat Zod → JSON Schema (usuwamy meta-pole $schema)
+const { $schema, ...invoiceSchema } = z.toJSONSchema(Invoice);
+
+const tool: Anthropic.Tool = {
+  name: "save_invoice",
+  description: "Zapisuje dane wyciągnięte z faktury.",
+  input_schema: invoiceSchema as Anthropic.Tool.InputSchema,
+};
+
+export async function extractInvoice(text: string) {
+  const res = await client.messages.create({
+    model: "claude-haiku-5-5",
+    max_tokens: 2000,
+    tools: [tool],
+    tool_choice: { type: "tool", name: "save_invoice" }, // wymuszenie
+    messages: [{ role: "user", content: `Wyciągnij dane z faktury. Brak danej = null.\n\n<faktura>\n${text}\n</faktura>` }],
+  });
+  const call = res.content.find(b => b.type === "tool_use");
+  if (!call) throw new Error("Model nie zwrócił danych");
+  return Invoice.parse(call.input); // walidacja — rzuci, jeśli coś się nie zgadza
+}
+</code-block>
+<code-block lang="typescript" file="src/03-extract-openai.ts">
+import OpenAI from "openai";
+const client = new OpenAI();
+
+const res = await client.responses.create({
+  model: "gpt-5.4-mini",
+  input: "Wyciągnij nazwę i kwotę: 'Faktura od ACME na 1230,50 zł'",
+  text: {
+    format: {
+      type: "json_schema",
+      name: "invoice",
+      strict: true, // constrained decoding
+      schema: {
+        type: "object",
+        properties: { vendor: { type: "string" }, amount: { type: "number" } },
+        required: ["vendor", "amount"],
+        additionalProperties: false,
+      },
+    },
+  },
+});
+const data = JSON.parse(res.output_text); // nadal waliduj przed użyciem
+</code-block>
+
+<h2>Stop reason — zawsze go sprawdzaj</h2>
+<div class="table-wrap"><table>
+<tr><th>Wartość (Anthropic / OpenAI)</th><th>Znaczenie</th><th>Reakcja</th></tr>
+<tr><td><code>end_turn</code> / <code>completed</code></td><td>Model skończył naturalnie</td><td>OK</td></tr>
+<tr><td><code>max_tokens</code> / <code>incomplete</code></td><td>Ucięte na limicie</td><td>Odpowiedź niepełna — JSON może być niepoprawny. Zwiększ limit albo poproś o kontynuację.</td></tr>
+<tr><td><code>tool_use</code></td><td>Model chce wywołać narzędzie</td><td>Wykonaj narzędzie i odeślij wynik (moduł 11)</td></tr>
+<tr><td><code>stop_sequence</code></td><td>Trafiono na stop sequence</td><td>OK, zgodnie z planem</td></tr>
+<tr><td><code>refusal</code></td><td>Model odmówił (polityki bezpieczeństwa)</td><td>Obsłuż w UI, nie ponawiaj w kółko</td></tr>
+</table></div>
+
+<h2>Błędy, retry i limity</h2>
+<div class="table-wrap"><table>
+<tr><th>Kod</th><th>Przyczyna</th><th>Retry?</th></tr>
+<tr><td>400</td><td>Błędne żądanie (zły format, za długi kontekst)</td><td>❌ napraw kod</td></tr>
+<tr><td>401 / 403</td><td>Klucz / uprawnienia</td><td>❌</td></tr>
+<tr><td>429</td><td>Rate limit (RPM/TPM) — sprawdź nagłówek <code>retry-after</code></td><td>✅ z backoffem</td></tr>
+<tr><td>500 / 502 / 503 / 529</td><td>Błąd lub przeciążenie po stronie dostawcy</td><td>✅ z backoffem, potem fallback</td></tr>
+</table></div>
+<code-block lang="typescript" file="src/lib/retry.ts">
+// Oficjalne SDK mają wbudowany retry: new Anthropic({ maxRetries: 3, timeout: 60_000 })
+// Gdy budujesz własny (np. fallback między dostawcami):
+export async function withRetry<T>(fn: () => Promise<T>, tries = 4): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const status = err?.status as number | undefined;
+      const retryable = status === 429 || (status !== undefined && status >= 500);
+      if (!retryable || attempt >= tries - 1) throw err;
+      const base = 500 * 2 ** attempt;                 // 0.5s, 1s, 2s, 4s
+      const delay = base / 2 + Math.random() * base;   // jitter — rozprasza ruch
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
+// Fallback: spróbuj głównego modelu, potem zapasowego
+export async function completeWithFallback(prompt: string) {
+  try { return await withRetry(() => callAnthropic(prompt)); }
+  catch { return await withRetry(() => callOpenAI(prompt)); }
+}
+declare function callAnthropic(p: string): Promise<string>;
+declare function callOpenAI(p: string): Promise<string>;
+</code-block>
+
+<h2>Koszty: tokeny × cena</h2>
+<p>Ceny podaje się za milion tokenów (MTok), osobno dla wejścia i wyjścia. Wpisz realne wartości ze swojego projektu i cennika wybranego modelu.</p>
+<div class="widget" data-widget="cost">
+<div class="w-title">Kalkulator kosztów</div>
+<div class="row">
+<div><label>Tokeny wejścia / request</label><input type="number" name="in" value="3000"></div>
+<div><label>Tokeny wyjścia / request</label><input type="number" name="out" value="500"></div>
+<div><label>Requesty / dzień</label><input type="number" name="rpd" value="10000"></div>
+</div><div class="row">
+<div><label>Cena input ($ / MTok)</label><input type="number" step="0.01" name="pin" value="3"></div>
+<div><label>Cena output ($ / MTok)</label><input type="number" step="0.01" name="pout" value="15"></div>
+<div><label>% wejścia z cache</label><input type="number" name="cache" value="0"></div>
+<div><label>Cena cache (% ceny input)</label><input type="number" name="cmul" value="10"></div>
+</div>
+<div class="out"></div>
+<p style="font-size:.8rem;color:var(--muted);margin:.5em 0 0">Wartości domyślne są przykładowe. Sprawdź „% wejścia z cache” na 80 — zobacz, ile daje prompt caching przy długim, stałym system prompcie.</p>
+</div>
+
+<h3>Liczenie tokenów przed wysłaniem</h3>
+<code-block lang="typescript" file="src/04-count.ts">
+const count = await client.messages.countTokens({
+  model: "claude-sonnet-5-5",
+  system: longSystemPrompt,
+  messages: [{ role: "user", content: userText }],
+});
+if (count.input_tokens > 150_000) {
+  // przytnij historię, streść dokumenty albo odrzuć żądanie
+}
+</code-block>
+
+<h2>Trzy dźwignie optymalizacji kosztów</h2>
+<div class="grid">
+<div class="card"><h4>⚡ Prompt caching</h4><p>Stały prefiks (system prompt, definicje narzędzi, duży dokument) jest cache'owany po stronie dostawcy. Kolejne wywołania czytają go wielokrotnie taniej i szybciej. W Anthropic oznaczasz punkt cache <code>cache_control</code>, OpenAI cache'uje długie prefiksy automatycznie.</p></div>
+<div class="card"><h4>📦 Batch API</h4><p>Zadania niewymagające natychmiastowej odpowiedzi (nocne przetwarzanie, ewaluacje) wysyłasz paczką — wynik w ciągu do 24 h, zwykle za ok. połowę ceny.</p></div>
+<div class="card"><h4>✂️ Mniej tokenów</h4><p>Mniejszy model tam, gdzie wystarcza, krótsze odpowiedzi (format!), przycinanie historii i wyników narzędzi, RAG zamiast całych dokumentów.</p></div>
+</div>
+<code-block lang="typescript" file="src/05-cache.ts">
+const res = await client.messages.create({
+  model: "claude-sonnet-5-5",
+  max_tokens: 1000,
+  system: [
+    {
+      type: "text",
+      text: HUGE_PRODUCT_MANUAL, // np. 40k tokenów, identyczne w każdym wywołaniu
+      cache_control: { type: "ephemeral" }, // wszystko DO tego miejsca trafia do cache
+    },
+  ],
+  messages: [{ role: "user", content: question }], // zmienna część — PO prefiksie
+});
+console.log(res.usage.cache_creation_input_tokens, res.usage.cache_read_input_tokens);
+</code-block>
+<div class="callout warn"><span class="t">Cache działa tylko na identycznym prefiksie</span>Dowolna zmiana na początku (np. data i godzina wstawiona do system promptu) unieważnia cache. Zmienne elementy umieszczaj <b>na końcu</b> kontekstu.</div>
+
+<div class="callout bad"><span class="t">Bezpieczeństwo klucza API</span>Nigdy nie umieszczaj klucza w kodzie frontendu ani w repozytorium. Wywołania zawsze przez Twój backend, z własnym limitem per użytkownik — inaczej ktoś wyda Twój budżet w jedną noc.</div>
+
+<div class="quiz" data-answer="2"><div class="q">Twój endpoint zwraca czasem niepoprawny JSON, a w logach widać <code>stop_reason: "max_tokens"</code>. Co się dzieje?</div>
+<button class="opt">Model nie rozumie formatu JSON</button>
+<button class="opt">Temperature jest za wysoka</button>
+<button class="opt">Odpowiedź została ucięta na limicie max_tokens — JSON nie został domknięty</button>
+<button class="opt">Wystąpił rate limit</button>
+<div class="expl">Stop reason „max_tokens” oznacza ucięcie. Zwiększ limit, skróć oczekiwany output albo podziel zadanie. I zawsze sprawdzaj stop_reason przed parsowaniem.</div></div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Najpierw poczuj API na żywo, potem napisz elementy, które w produkcji otaczają każde wywołanie: parser strumienia, ponawianie, raport kosztów i walidację wyniku.</p>
+<div data-lab="playground"></div>
+<div data-lab="extract"></div>
+<div data-kata="m04-sse"></div>
+<div data-kata="m04-retry"></div>
+<div data-kata="m04-cost-report"></div>
+<div data-kata="m04-invoice-validate"></div>
+</section>

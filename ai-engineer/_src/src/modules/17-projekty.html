@@ -1,0 +1,141 @@
+<section class="module" id="m17" data-num="17" data-title="Projekty i kariera">
+<div class="module-head"><div class="kicker">Moduł 17 · Hands-on</div><h1>Projekty praktyczne, plan nauki i rekrutacja</h1>
+<p>Sześć projektów, które razem pokrywają całą roadmapę i nadają się do portfolio. Do tego 12-tygodniowy plan, samoocena kompetencji i pytania z rozmów rekrutacyjnych.</p>
+<div class="goals"><span>6 projektów ze specyfikacją</span><span>plan 12 tygodni</span><span>portfolio</span><span>pytania rekrutacyjne</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> Rekruterzy na stanowiska AI Engineer szukają dowodów, że dowiozłeś działający system z <b>ewaluacją, kontrolą kosztów i bezpieczeństwem</b> — nie kolejnego „czatu z PDF-em” z tutoriala. Każdy projekt poniżej ma kryteria, które to pokazują.</div>
+
+<h2>Projekty</h2>
+
+<details open><summary>Projekt 1 · Ekstraktor faktur (moduły 02–05)</summary>
+<p><b>Cel:</b> API przyjmujące tekst lub zdjęcie faktury i zwracające ustrukturyzowane dane.</p>
+<ul>
+<li>Endpoint <code>POST /extract</code> (Next.js route lub Hono), wejście: tekst lub obraz.</li>
+<li>Schemat Zod, structured output, walidacja + jedno ponowienie z komunikatem błędu dla modelu.</li>
+<li>Logowanie tokenów i kosztu każdego wywołania.</li>
+<li>Zestaw 20 faktur testowych z oczekiwanymi wartościami i skrypt mierzący dokładność per pole.</li>
+</ul>
+<p><b>Rozszerzenia:</b> porównanie dwóch modeli (dokładność vs koszt) w README; obsługa PDF.</p>
+</details>
+
+<details><summary>Projekt 2 · Asystent wiedzy z RAG (moduły 08–10)</summary>
+<p><b>Cel:</b> czat odpowiadający na pytania o zbiór dokumentów (np. regulaminy, dokumentacja techniczna open-source) z cytatami.</p>
+<ul>
+<li>Pipeline ingest: parsowanie Markdown/PDF, chunking z nagłówkami kontekstowymi, Postgres + pgvector.</li>
+<li>Wyszukiwanie hybrydowe (wektory + full-text, RRF) i reranking.</li>
+<li>Odpowiedzi z cytatami [n] i linkami do źródeł w UI; odpowiedź „nie znalazłem”, gdy brak danych.</li>
+<li>Streaming w React.</li>
+<li>Eval: 50 pytań z oznaczonymi źródłami — recall@5 i faithfulness (LLM-as-judge); tabela wyników dla 3 konfiguracji chunkingu.</li>
+</ul>
+<p><b>Rozszerzenia:</b> multi-tenancy z izolacją danych; re-indeksacja tylko zmienionych plików.</p>
+</details>
+
+<details><summary>Projekt 3 · Agent obsługi klienta (moduły 06, 11)</summary>
+<p><b>Cel:</b> agent z narzędziami do obsługi zamówień w przykładowym sklepie (baza z seedem).</p>
+<ul>
+<li>Pętla agenta napisana od zera; narzędzia: wyszukaj zamówienia, status, polityka zwrotów (RAG), anuluj (z zatwierdzeniem w UI), przekaż człowiekowi.</li>
+<li>Autoryzacja na poziomie danych (klient widzi tylko swoje zamówienia).</li>
+<li>Limity: kroki, tokeny, koszt per rozmowa.</li>
+<li>Zestaw ataków (injection w wiadomości i w danych zamówienia) jako część evali.</li>
+<li>Widok trajektorii w panelu admina (które narzędzia, ile kroków, koszt).</li>
+</ul>
+</details>
+
+<details><summary>Projekt 4 · Serwer MCP do Twojego API (moduł 12)</summary>
+<p><b>Cel:</b> serwer MCP udostępniający realny system (np. Twoje projekty, GitHub issues, baza z danymi) jako narzędzia i zasoby.</p>
+<ul>
+<li>3–5 dobrze zaprojektowanych narzędzi (opisy, enumy, pomocne błędy), 1–2 zasoby, 1 prompt.</li>
+<li>Transport stdio do pracy lokalnej i Streamable HTTP do wdrożenia.</li>
+<li>Testy narzędzi bez modelu (wywołania przez klienta MCP w testach).</li>
+<li>README z demonstracją w Claude i opisem modelu zagrożeń.</li>
+</ul>
+</details>
+
+<details><summary>Projekt 5 · Lokalny, prywatny asystent (moduły 07, 13)</summary>
+<p><b>Cel:</b> aplikacja działająca w 100% offline: notatki głosowe → transkrypcja → streszczenie → wyszukiwanie semantyczne.</p>
+<ul>
+<li>Whisper lokalnie, LLM przez Ollamę, embeddingi lokalne (np. transformers.js w przeglądarce lub w Node).</li>
+<li>Porównanie jakości i czasu dla 2 rozmiarów modelu i 2 poziomów kwantyzacji.</li>
+<li>Ta sama warstwa abstrakcji pozwala przełączyć się na model chmurowy jedną zmienną.</li>
+</ul>
+</details>
+
+<details><summary>Projekt 6 · Destylacja klasyfikatora (moduły 14, 15)</summary>
+<p><b>Cel:</b> pokazać, że mały model po fine-tuningu dorównuje dużemu w wąskim zadaniu.</p>
+<ul>
+<li>Zbiór 1000+ tekstów (publiczny zbiór lub syntetyczny), etykiety od dużego modelu z dobrym promptem, przegląd próbki ręcznie.</li>
+<li>LoRA na małym modelu open-source albo fine-tuning przez API.</li>
+<li>Tabela: dokładność / koszt na 1000 zapytań / latencja — duży model vs mały bazowy vs mały dostrojony.</li>
+</ul>
+</details>
+
+<h2>Plan 12 tygodni (ok. 8–10 h tygodniowo)</h2>
+<figure>
+<svg viewBox="0 0 680 300">
+<g font-size="11.5">
+<g class="svg-muted" text-anchor="middle"><text x="155" y="16">1</text><text x="200" y="16">2</text><text x="245" y="16">3</text><text x="290" y="16">4</text><text x="335" y="16">5</text><text x="380" y="16">6</text><text x="425" y="16">7</text><text x="470" y="16">8</text><text x="515" y="16">9</text><text x="560" y="16">10</text><text x="605" y="16">11</text><text x="650" y="16">12</text></g>
+<g>
+<text x="10" y="44" class="svg-text">LLM, API, prompting</text><rect x="135" y="32" width="130" height="18" rx="5" fill="var(--c1)"/>
+<text x="10" y="74" class="svg-text">Projekt 1</text><rect x="225" y="62" width="85" height="18" rx="5" fill="var(--c1)" opacity=".55"/>
+<text x="10" y="104" class="svg-text">Bezpieczeństwo, OSS</text><rect x="270" y="92" width="85" height="18" rx="5" fill="var(--c4)"/>
+<text x="10" y="134" class="svg-text">Embeddingi, wektory, RAG</text><rect x="315" y="122" width="130" height="18" rx="5" fill="var(--c3)"/>
+<text x="10" y="164" class="svg-text">Projekt 2</text><rect x="405" y="152" width="85" height="18" rx="5" fill="var(--c3)" opacity=".55"/>
+<text x="10" y="194" class="svg-text">Agenci + MCP</text><rect x="450" y="182" width="85" height="18" rx="5" fill="var(--c2)"/>
+<text x="10" y="224" class="svg-text">Projekty 3 + 4</text><rect x="495" y="212" width="85" height="18" rx="5" fill="var(--c2)" opacity=".55"/>
+<text x="10" y="254" class="svg-text">Evale, LLMOps, multimodal</text><rect x="540" y="242" width="85" height="18" rx="5" fill="var(--c6)"/>
+<text x="10" y="284" class="svg-text">Fine-tuning, portfolio</text><rect x="585" y="272" width="85" height="18" rx="5" fill="var(--c5)"/>
+</g></g>
+</svg>
+<figcaption>Projekty 5 i 6 traktuj jako rozszerzenia po 12 tygodniach albo zamienniki, jeśli celujesz w role z naciskiem na self-hosting lub fine-tuning.</figcaption>
+</figure>
+
+<h2>Jak pokazać projekty w portfolio</h2>
+<ul>
+<li><b>README jak raport inżynierski</b>: problem, architektura (diagram), decyzje i odrzucone alternatywy, wyniki evali w tabeli, koszt na 1000 zapytań, znane ograniczenia.</li>
+<li><b>Demo</b>: wdrożona wersja lub 2-minutowe nagranie.</li>
+<li><b>Liczby</b>: „recall@5 wzrósł z 71% do 89% po dodaniu hybrydy i contextual headers” mówi więcej niż lista technologii.</li>
+<li><b>Twoja przewaga</b>: doświadczenie frontendowe — dopracowany UX streamingu, stanów błędów, cytatów i zatwierdzania akcji wyróżnia projekt na tle backendowych demo.</li>
+</ul>
+
+<h2>Samoocena: czy jestem gotowy?</h2>
+<ul class="checklist">
+<li><input type="checkbox" data-id="m17-1"><span>Potrafię wyjaśnić tokenizację, okno kontekstowe, temperature i dlaczego modele halucynują.</span></li>
+<li><input type="checkbox" data-id="m17-2"><span>Zbudowałem streaming czatu end-to-end i obsługę błędów 429/5xx z fallbackiem.</span></li>
+<li><input type="checkbox" data-id="m17-3"><span>Używam structured output z walidacją i rozumiem stop reasons.</span></li>
+<li><input type="checkbox" data-id="m17-4"><span>Zbudowałem RAG z hybrydą i rerankingiem oraz zmierzyłem recall.</span></li>
+<li><input type="checkbox" data-id="m17-5"><span>Napisałem pętlę agenta od zera i zaprojektowałem narzędzia z autoryzacją.</span></li>
+<li><input type="checkbox" data-id="m17-6"><span>Napisałem serwer MCP i podłączyłem go do klienta.</span></li>
+<li><input type="checkbox" data-id="m17-7"><span>Mam zestaw evali uruchamiany w CI i wiem, jak skalibrować LLM-as-judge.</span></li>
+<li><input type="checkbox" data-id="m17-8"><span>Umiem policzyć koszt systemu i wskazać 3 sposoby jego obniżenia.</span></li>
+<li><input type="checkbox" data-id="m17-9"><span>Znam OWASP LLM Top 10 i umiem zabezpieczyć agenta przed indirect injection.</span></li>
+<li><input type="checkbox" data-id="m17-10"><span>Uruchomiłem model lokalnie i rozumiem kwantyzację oraz wymagania sprzętowe.</span></li>
+<li><input type="checkbox" data-id="m17-11"><span>Wiem, kiedy fine-tuning ma sens, i przeprowadziłem przynajmniej jeden.</span></li>
+</ul>
+
+<h2>Pytania z rozmów rekrutacyjnych</h2>
+<p>Spróbuj odpowiedzieć na głos, zanim rozwiniesz odpowiedź.</p>
+<details><summary>Jak zaprojektowałbyś czatbota do dokumentacji firmy z 50 tys. dokumentów i różnymi uprawnieniami?</summary>
+<p>RAG: pipeline ingest z parsowaniem i chunkingiem po strukturze, metadane z ACL przy każdym chunku, filtr uprawnień w zapytaniu do bazy (nie w prompcie), wyszukiwanie hybrydowe + reranking, generowanie z cytatami i opcją „nie wiem”. Inkrementalna re-indeksacja. Evale retrieval (recall@k) i generation (faithfulness). Observability, limity per użytkownik, prompt caching system promptu.</p></details>
+<details><summary>RAG zwraca złe odpowiedzi. Jak debugujesz?</summary>
+<p>Rozdzielam retrieval od generacji: dla nieudanych pytań sprawdzam, czy właściwy fragment jest w top-k. Jeśli nie — chunking, parsowanie, hybryda, query rewriting, większe k + reranker. Jeśli tak — prompt, ilość szumu w kontekście, model. Każdy przypadek dopisuję do zestawu evali.</p></details>
+<details><summary>Czym różni się fine-tuning od RAG i kiedy wybrać każde z nich?</summary>
+<p>RAG dostarcza wiedzę w kontekście w czasie zapytania — aktualną, z cytatami, z kontrolą dostępu. Fine-tuning zmienia zachowanie modelu: format, styl, wąską umiejętność, pozwala użyć mniejszego modelu. Wiedza → RAG; zachowanie i koszt → fine-tuning; często oba razem.</p></details>
+<details><summary>Jak obniżyłbyś koszt systemu o 70%?</summary>
+<p>Pomiar kosztu per funkcja i typ zapytania; routing do mniejszych modeli tam, gdzie evale pokazują równą jakość; prompt caching stałego prefiksu; skrócenie promptów i outputu (format); przycinanie historii i wyników narzędzi; batch API dla zadań offline; cache dokładnych odpowiedzi; ewentualnie destylacja do małego modelu.</p></details>
+<details><summary>Czym jest prompt injection i jak się przed nim bronisz?</summary>
+<p>Wstrzyknięcie instrukcji do kontekstu modelu bezpośrednio lub przez przetwarzane treści (strony, e-maile, dokumenty). Obrona warstwowa: najmniejsze uprawnienia narzędzi, zatwierdzanie akcji przez człowieka, autoryzacja z sesji, oznaczanie niezaufanych treści, bezpieczne renderowanie wyjścia, klasyfikatory, unikanie „śmiertelnej trójki”. Nie da się tego rozwiązać samym promptem.</p></details>
+<details><summary>Jak ocenić jakość systemu, gdy nie ma jednej poprawnej odpowiedzi?</summary>
+<p>Zestaw przypadków z realnych danych, kryteria binarne zamiast skali 1–10, gradery kodowe gdzie się da, LLM-as-judge z rubryką skalibrowany na ocenach ludzi, wyniki per kategoria, bramka w CI, online evale na próbce ruchu i feedback użytkowników.</p></details>
+<details><summary>Kiedy użyjesz agenta, a kiedy workflow?</summary>
+<p>Workflow, gdy kroki są znane z góry — przewidywalny, tańszy, łatwiejszy w testach. Agent, gdy liczby i kolejności kroków nie da się przewidzieć i potrzebna jest elastyczność. Zaczynam od najprostszego rozwiązania i dodaję autonomię tylko tam, gdzie evale pokazują zysk.</p></details>
+<details><summary>Co to jest temperature i jak ją ustawisz w ekstrakcji danych?</summary>
+<p>Parametr skalujący logity przed softmaxem — kontroluje losowość wyboru tokenów. Dla ekstrakcji niska (0–0.2), plus structured output i walidacja. Pamiętam, że nawet przy 0 determinizm nie jest gwarantowany.</p></details>
+<details><summary>Jak wybierasz model do nowego zadania?</summary>
+<p>Prototyp na mocnym modelu, żeby sprawdzić wykonalność; zestaw evali; porównanie 2–3 modeli na jakości, latencji i koszcie przy realnym wolumenie; wymagania (kontekst, narzędzia, vision, język, region danych); wybór najtańszego spełniającego próg jakości; fallback na innego dostawcę.</p></details>
+<details><summary>Jak obsłużysz długą rozmowę, która przekracza okno kontekstowe?</summary>
+<p>Budżet tokenów per część kontekstu, przycinanie starych wyników narzędzi, streszczanie starszych tur (kompaktowanie) z zachowaniem decyzji i faktów, pamięć długotrwała poza kontekstem (baza + narzędzie wyszukiwania), prompt caching stałego prefiksu.</p></details>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Laboratoria są prototypami projektów z tego modułu. Postępy i pełną listę ćwiczeń znajdziesz w sekcji <a href="#lab">Laboratorium: jak zacząć</a>.</p>
+
+</section>

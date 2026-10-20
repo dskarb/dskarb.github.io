@@ -1,0 +1,172 @@
+<section class="module" id="m14" data-num="14" data-title="Fine-tuning">
+<div class="module-head"><div class="kicker">Moduł 14 · Zaawansowane</div><h1>Fine-tuning: kiedy i jak dostrajać modele</h1>
+<p>Fine-tuning to potężne, ale często nadużywane narzędzie. Dowiesz się, kiedy ma sens, jak przygotować dane, czym jest LoRA i jak przeprowadzić trening przez API oraz lokalnie.</p>
+<div class="goals"><span>drzewo decyzji</span><span>SFT, LoRA, DPO</span><span>przygotowanie danych</span><span>destylacja</span><span>ewaluacja przed/po</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> Fine-tuning zmienia <b>zachowanie</b> modelu (format, styl, wąska umiejętność), a nie jego <b>wiedzę</b>. Najpierw wyciśnij maksimum z promptu i RAG. Najczęstszy dobry powód do fine-tuningu w produkcji: <b>tańszy i szybszy mały model</b>, który w jednym konkretnym zadaniu dorównuje dużemu.</div>
+
+<h2>Drzewo decyzji</h2>
+<figure>
+<svg viewBox="0 0 680 330">
+<defs><marker id="ar14" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+<g font-size="12" font-weight="600" text-anchor="middle">
+<rect x="220" y="10" width="240" height="40" rx="10" class="svg-box" stroke="var(--c1)"/><text x="340" y="35" class="svg-text">Czy dobry prompt + przykłady wystarczą?</text>
+<rect x="520" y="10" width="150" height="40" rx="10" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="595" y="35" class="svg-text">✓ Zostań przy prompcie</text>
+<rect x="220" y="95" width="240" height="40" rx="10" class="svg-box" stroke="var(--c1)"/><text x="340" y="120" class="svg-text">Brakuje wiedzy / aktualnych danych?</text>
+<rect x="520" y="95" width="150" height="40" rx="10" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="595" y="120" class="svg-text">✓ RAG / narzędzia</text>
+<rect x="220" y="180" width="240" height="40" rx="10" class="svg-box" stroke="var(--c1)"/><text x="340" y="205" class="svg-text">Masz ≥ 100 wysokiej jakości przykładów?</text>
+<rect x="10" y="180" width="170" height="40" rx="10" fill="var(--warn-soft)" stroke="var(--warn)"/><text x="95" y="205" class="svg-text">Zbierz dane / evale</text>
+<rect x="220" y="265" width="240" height="50" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="340" y="287" class="svg-text">Fine-tuning ma sens:</text><text x="340" y="304" class="svg-muted" font-size="11">format, styl, koszt, latencja, wąskie zadanie</text>
+</g>
+<g font-size="11" class="svg-muted"><text x="490" y="25">tak</text><text x="350" y="72">nie</text><text x="490" y="110">tak</text><text x="350" y="157">nie (to zachowanie)</text><text x="350" y="242">tak</text><text x="190" y="195">nie</text></g>
+<g class="svg-line" stroke-width="1.5" marker-end="url(#ar14)"><path d="M460 30H518"/><path d="M340 50V93"/><path d="M460 115H518"/><path d="M340 135V178"/><path d="M220 200H182"/><path d="M340 220V263"/></g>
+</svg>
+</figure>
+
+<div class="vs">
+<div class="card"><h4>✅ Dobre powody</h4><p>Spójny format/styl, którego nie da się stabilnie uzyskać promptem. Krótszy prompt (instrukcje „wtopione” w model) → niższy koszt. Mały model dorównujący dużemu w wąskim zadaniu (klasyfikacja, ekstrakcja, routing). Specjalistyczny żargon i konwencje.</p></div>
+<div class="card"><h4>❌ Złe powody</h4><p>„Chcę, żeby model znał naszą dokumentację” → RAG. „Model halucynuje” → RAG, cytaty, weryfikacja. „Chcę aktualnych danych” → narzędzia. „Nie chce mi się pisać promptu” → fine-tuning wymaga dużo więcej pracy.</p></div>
+</div>
+
+<h2>Rodzaje dostrajania</h2>
+<div class="table-wrap"><table>
+<tr><th>Metoda</th><th>Dane</th><th>Do czego</th></tr>
+<tr><td><b>SFT</b> (supervised fine-tuning)</td><td>Pary: wejście → wzorcowa odpowiedź</td><td>Format, styl, konkretne zadanie. Najczęstszy wybór.</td></tr>
+<tr><td><b>DPO / preference tuning</b></td><td>Pytanie + odpowiedź lepsza + gorsza</td><td>Subtelne preferencje (ton, zwięzłość), gdy łatwiej ocenić niż napisać wzór</td></tr>
+<tr><td><b>RFT</b> (reinforcement fine-tuning)</td><td>Zadania + funkcja oceniająca (grader)</td><td>Zadania z weryfikowalnym wynikiem, poprawa rozumowania w domenie</td></tr>
+<tr><td><b>Pełny fine-tuning</b></td><td>Jak SFT</td><td>Aktualizuje wszystkie wagi — drogi, wymaga dużo GPU</td></tr>
+<tr><td><b>LoRA / QLoRA</b> (PEFT)</td><td>Jak SFT</td><td>Trenuje małe macierze-adaptery — ułamek kosztu, efekt zbliżony</td></tr>
+</table></div>
+
+<h2>LoRA — jak to działa</h2>
+<figure>
+<svg viewBox="0 0 680 220">
+<g font-size="12.5" text-anchor="middle">
+<rect x="30" y="40" width="150" height="150" fill="var(--surface-2)" stroke="var(--muted)"/><text x="105" y="120" class="svg-text" font-weight="700">W</text><text x="105" y="140" class="svg-muted" font-size="11">4096 × 4096</text><text x="105" y="30" class="svg-muted" font-size="11">zamrożone (16,8 mln)</text>
+<text x="215" y="120" font-size="22" class="svg-text">+</text>
+<rect x="250" y="40" width="26" height="150" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="263" y="210" class="svg-text" font-weight="700">B</text><text x="263" y="30" class="svg-muted" font-size="11">4096×16</text>
+<text x="300" y="120" font-size="18" class="svg-text">×</text>
+<rect x="320" y="102" width="150" height="26" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="395" y="150" class="svg-text" font-weight="700">A</text><text x="395" y="95" class="svg-muted" font-size="11">16×4096</text>
+<text x="505" y="120" font-size="22" class="svg-text">=</text>
+<rect x="530" y="40" width="130" height="150" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="595" y="115" class="svg-text" font-weight="700">W′</text><text x="595" y="135" class="svg-muted" font-size="11">trenujemy tylko</text><text x="595" y="150" class="svg-muted" font-size="11">131 tys. param.</text>
+</g>
+</svg>
+<figcaption>LoRA zamraża oryginalną macierz wag W i uczy dwóch „chudych” macierzy B i A (rank r = 16). Ich iloczyn to poprawka do W. Tutaj trenujemy 0,8% parametrów warstwy. Adapter waży megabajty, można go podmieniać — jeden model bazowy, wiele adapterów pod różne zadania. <b>QLoRA</b> dodatkowo trzyma model bazowy w 4 bitach, więc 8B dostroisz na jednej konsumenckiej karcie.</figcaption>
+</figure>
+
+<h2>Dane — to one decydują</h2>
+<ul>
+<li><b>Jakość &gt; ilość.</b> 200 perfekcyjnych przykładów pokonuje 5000 przypadkowych. Model nauczy się także błędów.</li>
+<li><b>Reprezentatywność</b>: rozkład przykładów jak w produkcji, w tym trudne i nietypowe przypadki.</li>
+<li><b>Ten sam format</b> co na produkcji (ten sam system prompt, struktura wejścia).</li>
+<li><b>Podział</b>: zbiór treningowy, walidacyjny (dobór hiperparametrów) i testowy, którego model nigdy nie widział.</li>
+<li><b>Źródła</b>: ręcznie oznaczone dane, poprawione odpowiedzi dużego modelu, logi produkcyjne (po anonimizacji i zgodnie z prawem).</li>
+</ul>
+<code-block lang="json" file="train.jsonl (jedna linia = jeden przykład)">
+{"messages":[{"role":"system","content":"Klasyfikujesz zgłoszenia. Zwróć JSON."},{"role":"user","content":"Kurier zgubił paczkę, chcę pieniądze"},{"role":"assistant","content":"{\"category\":\"dostawa\",\"urgent\":true}"}]}
+{"messages":[{"role":"system","content":"Klasyfikujesz zgłoszenia. Zwróć JSON."},{"role":"user","content":"Czy macie kubki 500 ml?"},{"role":"assistant","content":"{\"category\":\"produkt\",\"urgent\":false}"}]}
+</code-block>
+
+<h2>Wzorzec: destylacja (duży uczy małego)</h2>
+<div class="flow"><span class="node">1. Duży model + najlepszy prompt</span><span class="arrow">→</span><span class="node">2. Generuj odpowiedzi na tysiące realnych wejść</span><span class="arrow">→</span><span class="node">3. Filtruj (evale, człowiek)</span><span class="arrow">→</span><span class="node">4. SFT małego modelu</span><span class="arrow">→</span><span class="node">5. Porównaj na zbiorze testowym</span></div>
+<p>Efekt: jakość bliska dużemu modelowi w tym jednym zadaniu, przy kilkukrotnie niższym koszcie i latencji. Sprawdź warunki licencji dostawcy dotyczące używania wyników jego modeli do trenowania innych modeli.</p>
+
+<h2>Fine-tuning przez API (bez GPU)</h2>
+<code-block lang="typescript" file="src/finetune-api.ts">
+import OpenAI from "openai";
+import fs from "node:fs";
+const openai = new OpenAI();
+
+// 1. upload danych
+const train = await openai.files.create({ file: fs.createReadStream("train.jsonl"), purpose: "fine-tune" });
+const val = await openai.files.create({ file: fs.createReadStream("val.jsonl"), purpose: "fine-tune" });
+
+// 2. zadanie treningowe
+const job = await openai.fineTuning.jobs.create({
+  model: "<model bazowy z listy wspierających fine-tuning>",
+  training_file: train.id,
+  validation_file: val.id,
+  suffix: "ticket-classifier",
+});
+
+// 3. sprawdzaj status (albo webhook)
+let status = job.status;
+while (!["succeeded", "failed", "cancelled"].includes(status)) {
+  await new Promise(r => setTimeout(r, 30_000));
+  const j = await openai.fineTuning.jobs.retrieve(job.id);
+  status = j.status;
+  console.log(status, j.fine_tuned_model ?? "");
+}
+// 4. wynikowy model wołasz jak każdy inny, podając jego ID (ft:...)
+</code-block>
+<p>Fine-tuning przez API oferuje część dostawców (m.in. OpenAI, Google Vertex, Amazon Bedrock dla wybranych modeli, w tym niektórych modeli Claude). Lista modeli i metod zmienia się — sprawdzaj dokumentację.</p>
+
+<h2>LoRA na modelu open-source (Python)</h2>
+<code-block lang="python" file="train_lora.py">
+# pip install transformers trl peft datasets accelerate bitsandbytes
+from datasets import load_dataset
+from peft import LoraConfig
+from trl import SFTTrainer, SFTConfig
+
+dataset = load_dataset("json", data_files={"train": "train.jsonl", "test": "val.jsonl"})
+
+peft_config = LoraConfig(
+    r=16,                 # rank — rozmiar adaptera
+    lora_alpha=32,        # skala poprawki
+    lora_dropout=0.05,
+    target_modules="all-linear",
+    task_type="CAUSAL_LM",
+)
+
+trainer = SFTTrainer(
+    model="Qwen/Qwen3-1.7B",          # mały model — szybkie eksperymenty
+    train_dataset=dataset["train"],   # kolumna "messages" → chat template stosowany automatycznie
+    eval_dataset=dataset["test"],
+    peft_config=peft_config,
+    args=SFTConfig(
+        output_dir="out/ticket-lora",
+        num_train_epochs=3,
+        per_device_train_batch_size=4,
+        learning_rate=2e-4,
+        eval_strategy="epoch",
+        logging_steps=10,
+    ),
+)
+trainer.train()
+trainer.save_model("out/ticket-lora")   # zapisuje tylko adapter (kilka-kilkadziesiąt MB)
+</code-block>
+<h3>Jak czytać krzywe uczenia</h3>
+<figure>
+<svg viewBox="0 0 600 220">
+<g font-size="11"><line x1="50" y1="190" x2="580" y2="190" stroke="var(--muted)"/><line x1="50" y1="20" x2="50" y2="190" stroke="var(--muted)"/>
+<text x="315" y="212" text-anchor="middle" class="svg-muted">kroki treningu</text><text x="20" y="105" class="svg-muted" transform="rotate(-90 20 105)" text-anchor="middle">loss</text>
+<path d="M50 40 C150 120, 300 160, 580 175" stroke="var(--c1)" stroke-width="2.5" fill="none"/>
+<path d="M50 45 C150 120, 260 140, 330 135 S 480 110, 580 85" stroke="var(--c2)" stroke-width="2.5" fill="none"/>
+<line x1="330" y1="20" x2="330" y2="190" stroke="var(--c3)" stroke-dasharray="4 4"/>
+<text x="335" y="35" class="svg-text">tu zatrzymaj (najlepszy checkpoint)</text>
+<text x="470" y="170" fill="var(--c1)" font-weight="700">train loss</text><text x="470" y="78" fill="var(--c2)" font-weight="700">val loss ↑ overfitting</text>
+</g>
+</svg>
+<figcaption>Gdy strata walidacyjna zaczyna rosnąć, a treningowa dalej spada, model zapamiętuje przykłady zamiast się uogólniać. Mniej epok, więcej danych albo mniejszy learning rate.</figcaption>
+</figure>
+
+<h2>Ewaluacja: przed i po</h2>
+<ul class="checklist">
+<li><input type="checkbox" data-id="m14-1"><span>Baseline: model bazowy + najlepszy prompt na zbiorze testowym</span></li>
+<li><input type="checkbox" data-id="m14-2"><span>Model po fine-tuningu na <b>tym samym</b> zbiorze testowym</span></li>
+<li><input type="checkbox" data-id="m14-3"><span>Sprawdzenie, czy model nie stracił ogólnych umiejętności (catastrophic forgetting) — kilka zadań spoza domeny</span></li>
+<li><input type="checkbox" data-id="m14-4"><span>Koszt i latencja na realnym ruchu, w tym koszt hostingu modelu dostrojonego</span></li>
+<li><input type="checkbox" data-id="m14-5"><span>Plan ponownego treningu, gdy dane lub model bazowy się zmienią</span></li>
+</ul>
+
+<div class="quiz" data-answer="3"><div class="q">Klient chce, żeby chatbot „znał” 3000 stron dokumentacji produktu, która zmienia się co tydzień. Co rekomendujesz?</div>
+<button class="opt">Fine-tuning na dokumentacji co tydzień</button>
+<button class="opt">Fine-tuning raz, potem RAG na zmianach</button>
+<button class="opt">Trening własnego modelu od zera</button>
+<button class="opt">RAG z re-indeksacją zmienionych dokumentów; fine-tuning ewentualnie później, jeśli trzeba poprawić styl lub format odpowiedzi</button>
+<div class="expl">Wiedza, która się zmienia i wymaga cytatów, to klasyczny przypadek RAG. Fine-tuning słabo wgrywa fakty i wymagałby ciągłego ponawiania treningu.</div></div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Najwięcej pracy przy fine-tuningu to dane. To zadanie przeprowadza Cię przez czyszczenie, deduplikację, wykrywanie konfliktów etykiet i podział na zbiory.</p>
+<div data-kata="m14-dataset"></div>
+</section>

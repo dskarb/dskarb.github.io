@@ -1,0 +1,195 @@
+<section class="module" id="m09" data-num="09" data-title="Bazy wektorowe">
+<div class="module-head"><div class="kicker">Moduł 09 · Wiedza</div><h1>Bazy wektorowe i wyszukiwanie</h1>
+<p>Jak szybko znaleźć najbliższe wektory wśród milionów: algorytmy ANN, indeksy HNSW, filtrowanie metadanych, wyszukiwanie hybrydowe i praktyka z pgvector.</p>
+<div class="goals"><span>ANN vs brute force</span><span>HNSW / IVF</span><span>filtry i multi-tenancy</span><span>hybrid search + RRF</span><span>pgvector od A do Z</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> Baza wektorowa przechowuje wektory z metadanymi i odpowiada na pytanie „daj k najbliższych do tego wektora” w milisekundach — zamiast porównywać ze wszystkimi, używa indeksu <b>przybliżonego</b> (ANN). Na start w większości projektów wystarczy <b>Postgres + pgvector</b>.</div>
+
+<h2>Problem: brute force nie skaluje się</h2>
+<p>W module 08 porównywaliśmy zapytanie z każdym dokumentem. Dla 1 mln dokumentów po 1536 wymiarów to 1,5 mld mnożeń na każde zapytanie. Algorytmy <b>ANN (Approximate Nearest Neighbor)</b> sprawdzają tylko ułamek wektorów i znajdują <i>prawie zawsze</i> właściwych sąsiadów. Miarą jakości jest <b>recall@k</b>: jaki odsetek prawdziwych k najbliższych sąsiadów znalazł indeks.</p>
+
+<h2>HNSW — graf „małego świata”</h2>
+<p>Najpopularniejszy algorytm. Wektory są węzłami grafu połączonymi z bliskimi sąsiadami. Wyszukiwanie zaczyna w punkcie wejścia i <b>zachłannie</b> skacze do sąsiada bliższego zapytaniu, aż nie da się zbliżyć bardziej. Kliknij w płótno, żeby zadać zapytanie:</p>
+<div class="widget" data-widget="annsearch">
+<div class="w-title">Zachłanne wyszukiwanie w grafie</div>
+<canvas></canvas>
+<div class="controls"><button class="btn rnd">Losowe zapytanie</button><button class="btn secondary regen">Nowy graf</button></div>
+<div class="out">Zielony punkt = wejście do grafu. Kliknij w płótno, aby wybrać zapytanie.</div>
+</div>
+<figure>
+<svg viewBox="0 0 640 250">
+<g font-size="12">
+<text x="10" y="40" class="svg-muted">Warstwa 2</text><text x="10" y="120" class="svg-muted">Warstwa 1</text><text x="10" y="205" class="svg-muted">Warstwa 0</text>
+<g stroke="var(--line)" stroke-width="1.2" fill="none"><path d="M120 35L470 35"/><path d="M120 115L280 115L470 115L560 115"/><path d="M120 200L180 200L230 200L280 200L340 200L400 200L470 200L520 200L560 200L600 200"/><path d="M180 200Q300 170 400 200"/></g>
+<g stroke="var(--c2)" stroke-width="2.5" fill="none" class="anim-dash"><path d="M120 35L470 35"/><path d="M470 40L470 110"/><path d="M470 115L560 115"/><path d="M560 120L560 195"/><path d="M560 200L520 200"/></g>
+<g fill="var(--muted)"><circle cx="120" cy="35" r="7" fill="var(--c3)"/><circle cx="470" cy="35" r="6"/>
+<circle cx="120" cy="115" r="5"/><circle cx="280" cy="115" r="5"/><circle cx="470" cy="115" r="5"/><circle cx="560" cy="115" r="5"/>
+<circle cx="120" cy="200" r="4"/><circle cx="180" cy="200" r="4"/><circle cx="230" cy="200" r="4"/><circle cx="280" cy="200" r="4"/><circle cx="340" cy="200" r="4"/><circle cx="400" cy="200" r="4"/><circle cx="470" cy="200" r="4"/><circle cx="520" cy="200" r="6" fill="var(--c2)"/><circle cx="560" cy="200" r="4"/><circle cx="600" cy="200" r="4"/></g>
+<text x="510" y="232" class="svg-text" font-weight="700">wynik</text>
+</g>
+</svg>
+<figcaption>HNSW buduje kilka warstw: górne są rzadkie (długie skoki, jak autostrada), dolna zawiera wszystkie punkty (dokładne dojazdy, jak ulice osiedlowe). Wyszukiwanie schodzi z góry na dół. Parametry: <code>M</code> (liczba krawędzi na węzeł), <code>ef_construction</code> (jakość budowy), <code>ef_search</code> (szerokość przeszukiwania — więcej = lepszy recall, wolniej).</figcaption>
+</figure>
+
+<div class="table-wrap"><table>
+<tr><th>Indeks</th><th>Idea</th><th>Zalety</th><th>Wady</th></tr>
+<tr><td><b>Flat</b> (brute force)</td><td>Porównaj ze wszystkimi</td><td>Recall 100%, zero budowy</td><td>Wolny powyżej ~100k wektorów</td></tr>
+<tr><td><b>HNSW</b></td><td>Wielowarstwowy graf</td><td>Świetny recall i szybkość, dynamiczne wstawianie</td><td>Dużo RAM, wolniejsza budowa</td></tr>
+<tr><td><b>IVF</b></td><td>Klastry (k-means), szukanie w kilku najbliższych</td><td>Mniej pamięci, szybka budowa</td><td>Wymaga treningu na danych, recall zależy od <code>nprobe</code></td></tr>
+<tr><td><b>PQ / kwantyzacja</b></td><td>Kompresja wektorów</td><td>10–30× mniej pamięci</td><td>Utrata precyzji (często łączone z rescoringiem)</td></tr>
+</table></div>
+
+<h2>Krajobraz baz wektorowych</h2>
+<div class="grid">
+<div class="card"><h4>Postgres + pgvector</h4><p>Wektory obok danych relacyjnych, transakcje, JOIN-y, filtry SQL. Dostępne w Supabase, Neon, RDS. <b>Domyślny wybór na start.</b></p></div>
+<div class="card"><h4>Qdrant / Weaviate / Milvus</h4><p>Dedykowane, open-source, self-hosted lub chmura. Bogate filtrowanie, hybrid search, skala setek milionów.</p></div>
+<div class="card"><h4>Pinecone</h4><p>W pełni zarządzane (serverless). Zero ops, płacisz za użycie.</p></div>
+<div class="card"><h4>Chroma / LanceDB</h4><p>Proste, embedded (jak SQLite dla wektorów). Świetne do prototypów i aplikacji lokalnych.</p></div>
+<div class="card"><h4>FAISS</h4><p>Biblioteka Meta (nie baza): najszybsze indeksy w pamięci, bez metadanych i trwałości.</p></div>
+<div class="card"><h4>Elasticsearch / OpenSearch / MongoDB Atlas / Redis</h4><p>Wyszukiwanie wektorowe dodane do istniejących systemów — dobre, gdy już ich używasz.</p></div>
+</div>
+
+<h2>pgvector — od zera do zapytania</h2>
+<code-block lang="sql" file="schema.sql">
+create extension if not exists vector;
+
+create table documents (
+  id          bigserial primary key,
+  tenant_id   uuid not null,                 -- izolacja klientów!
+  source      text not null,                 -- np. ścieżka pliku / URL
+  chunk_index int  not null,
+  content     text not null,
+  metadata    jsonb default '{}',
+  embedding   vector(1536) not null,         -- wymiar = wymiar modelu
+  embed_model text not null default 'text-embedding-3-small',
+  -- kolumna do wyszukiwania pełnotekstowego (dla hybrid search)
+  fts tsvector generated always as (to_tsvector('simple', content)) stored
+);
+
+-- indeks ANN: HNSW z metryką cosine
+create index on documents using hnsw (embedding vector_cosine_ops) with (m = 16, ef_construction = 64);
+create index on documents using gin (fts);
+create index on documents (tenant_id);
+
+-- Operatory pgvector:  <=> cosine distance   <-> L2   <#> ujemny iloczyn skalarny
+</code-block>
+<code-block lang="typescript" file="src/pg-store.ts">
+import pg from "pg";
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+const toVec = (v: number[]) => JSON.stringify(v); // pgvector akceptuje '[0.1,0.2,...]'
+
+export async function upsertChunks(tenantId: string, source: string, chunks: string[], vectors: number[][]) {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    // re-indeksacja pliku: usuń stare chunki, wstaw nowe (atomowo)
+    await client.query("delete from documents where tenant_id = $1 and source = $2", [tenantId, source]);
+    for (let i = 0; i < chunks.length; i++) {
+      await client.query(
+        `insert into documents (tenant_id, source, chunk_index, content, embedding)
+         values ($1, $2, $3, $4, $5)`,
+        [tenantId, source, i, chunks[i], toVec(vectors[i])],
+      );
+    }
+    await client.query("commit");
+  } catch (e) {
+    await client.query("rollback"); throw e;
+  } finally { client.release(); }
+}
+
+export async function searchVector(tenantId: string, queryVec: number[], k = 5) {
+  const { rows } = await pool.query(
+    `select id, source, content, 1 - (embedding <=> $2) as similarity
+       from documents
+      where tenant_id = $1                -- filtr metadanych
+      order by embedding <=> $2           -- ten zapis używa indeksu HNSW
+      limit $3`,
+    [tenantId, toVec(queryVec), k],
+  );
+  return rows;
+}
+</code-block>
+<div class="callout warn"><span class="t">Filtrowanie a indeks ANN</span>Gdy filtr jest bardzo selektywny (np. tenant ma 0,1% wszystkich wektorów), indeks HNSW może zwrócić za mało wyników — przeszukuje graf, a potem odrzuca niepasujące (post-filtering). Rozwiązania: większy <code>hnsw.ef_search</code>, tryb iteracyjnego skanowania w nowszych wersjach pgvector, partycjonowanie per tenant lub bazy z natywnym filtrowaniem w trakcie przeszukiwania grafu (Qdrant, Weaviate).</div>
+
+<h2>Wyszukiwanie hybrydowe</h2>
+<p>Embeddingi świetnie łapią znaczenie, ale gorzej radzą sobie z <b>dokładnymi ciągami</b>: kody produktów („XR-4410”), nazwiska, numery przepisów, skróty. Klasyczne wyszukiwanie leksykalne (<b>BM25</b>, full-text) robi to doskonale. Wyszukiwanie hybrydowe łączy oba rankingi.</p>
+<figure>
+<svg viewBox="0 0 640 170">
+<defs><marker id="ar9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+<g font-size="12.5" font-weight="600" text-anchor="middle">
+<rect x="10" y="62" width="110" height="44" rx="10" class="svg-box"/><text x="65" y="89" class="svg-text">Zapytanie</text>
+<rect x="170" y="15" width="170" height="44" rx="10" class="svg-box" stroke="var(--c5)"/><text x="255" y="35" class="svg-text">BM25 / full-text</text><text x="255" y="51" class="svg-muted" font-size="10.5">dokładne słowa</text>
+<rect x="170" y="110" width="170" height="44" rx="10" class="svg-box" stroke="var(--c1)"/><text x="255" y="130" class="svg-text">Wektory</text><text x="255" y="146" class="svg-muted" font-size="10.5">znaczenie</text>
+<rect x="390" y="62" width="110" height="44" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="445" y="89" class="svg-text">Fuzja (RRF)</text>
+<rect x="540" y="62" width="90" height="44" rx="10" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="585" y="89" class="svg-text">Top k</text>
+</g>
+<g class="svg-line" stroke-width="1.5" marker-end="url(#ar9)"><path d="M120 78L168 42"/><path d="M120 90L168 128"/><path d="M340 37L388 76"/><path d="M340 132L388 94"/><path d="M500 84H538"/></g>
+</svg>
+</figure>
+<p><b>Reciprocal Rank Fusion (RRF)</b> łączy rankingi bez potrzeby normalizowania wyników z różnych skal: <code>score(d) = Σ 1 / (k + pozycja_d)</code>, typowo <code>k = 60</code>. Dokument wysoko w obu listach wygrywa.</p>
+<div class="widget" data-widget="rrf">
+<div class="w-title">Kalkulator RRF</div>
+<p style="font-size:.88rem;margin:.2em 0">BM25: D3, D1, D7, D2, D9 · Wektory: D1, D5, D3, D8, D2</p>
+<label>Stała k: <b class="kv"></b></label><input type="range" name="k" min="1" max="100" value="60">
+<div class="out"></div>
+</div>
+<code-block lang="sql" file="hybrid_search.sql">
+-- $1 = wektor zapytania, $2 = tekst zapytania, $3 = tenant_id
+with semantic as (
+  select id, row_number() over (order by embedding <=> $1) as rank
+  from documents where tenant_id = $3
+  order by embedding <=> $1 limit 20
+),
+keyword as (
+  select id, row_number() over (order by ts_rank_cd(fts, websearch_to_tsquery('simple', $2)) desc) as rank
+  from documents
+  where tenant_id = $3 and fts @@ websearch_to_tsquery('simple', $2)
+  order by ts_rank_cd(fts, websearch_to_tsquery('simple', $2)) desc limit 20
+)
+select d.id, d.source, d.content,
+       coalesce(1.0 / (60 + s.rank), 0) + coalesce(1.0 / (60 + k.rank), 0) as rrf_score
+from semantic s
+full outer join keyword k on s.id = k.id
+join documents d on d.id = coalesce(s.id, k.id)
+order by rrf_score desc
+limit 5;
+</code-block>
+<div class="callout"><span class="t">Polski full-text</span>Postgres nie ma wbudowanego słownika języka polskiego, więc konfiguracja <code>'simple'</code> nie sprowadza słów do formy podstawowej („faktury” ≠ „faktura”). Pomaga rozszerzenie ze słownikiem polskim (Hunspell/ispell), lematyzacja przed indeksowaniem albo dedykowane wyszukiwarki (Elasticsearch z analizatorem polskim). Część wektorowa nie ma tego problemu.</div>
+
+<h2>Prototyp w 10 linijkach: Chroma</h2>
+<code-block lang="python" file="chroma_demo.py">
+import chromadb
+
+client = chromadb.PersistentClient(path="./chroma")      # dane na dysku
+col = client.get_or_create_collection("faq", metadata={"hnsw:space": "cosine"})
+
+col.add(
+    ids=["1", "2", "3"],
+    documents=["Zwrot w 14 dni", "Wysyłka 1-2 dni", "Reset hasła na stronie logowania"],
+    metadatas=[{"cat": "zwroty"}, {"cat": "dostawa"}, {"cat": "konto"}],
+)  # domyślnie Chroma sama embeduje teksty lokalnym modelem
+
+res = col.query(query_texts=["jak oddać buty"], n_results=2, where={"cat": {"$ne": "konto"}})
+print(res["documents"], res["distances"])
+</code-block>
+
+<h2>Jak wybrać</h2>
+<div class="flow"><span class="node">&lt; 1 mln wektorów i masz Postgresa?</span><span class="arrow">→</span><span class="node">pgvector</span></div>
+<div class="flow"><span class="node">Prototyp / aplikacja lokalna?</span><span class="arrow">→</span><span class="node">Chroma, LanceDB</span></div>
+<div class="flow"><span class="node">Setki mln wektorów, złożone filtry, hybrid?</span><span class="arrow">→</span><span class="node">Qdrant, Weaviate, Milvus</span></div>
+<div class="flow"><span class="node">Zero ops, budżet na usługę?</span><span class="arrow">→</span><span class="node">Pinecone lub zarządzane wersje powyższych</span></div>
+
+<div class="quiz" data-answer="0"><div class="q">Użytkownicy wpisują kody części („ZX-2210-B”) i wyszukiwarka wektorowa zwraca podobne, ale złe części. Co poprawi wyniki?</div>
+<button class="opt">Wyszukiwanie hybrydowe: dodanie BM25/full-text i połączenie rankingów przez RRF</button>
+<button class="opt">Większy model embeddingów</button>
+<button class="opt">Zwiększenie liczby wymiarów wektora</button>
+<button class="opt">Obniżenie ef_search</button>
+<div class="expl">Kody i identyfikatory to dokładne dopasowania leksykalne — mocna strona BM25, słaba strona embeddingów. Hybryda bierze to, co najlepsze z obu.</div></div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Trzy elementy, które bazy wektorowe i wyszukiwarki robią pod spodem: ranking BM25, fuzja rankingów i pomiar jakości wyszukiwania przybliżonego.</p>
+<div data-kata="m09-bm25"></div>
+<div data-kata="m09-rrf"></div>
+<div data-kata="m09-recall"></div>
+</section>

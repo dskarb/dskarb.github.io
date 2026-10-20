@@ -1,0 +1,270 @@
+<section class="module" id="m11" data-num="11" data-title="Agenci AI">
+<div class="module-head"><div class="kicker">Moduł 11 · Działanie</div><h1>Agenci AI i tool calling</h1>
+<p>Jak model „wykonuje akcje”, jak napisać pętlę agenta od zera, jak projektować narzędzia i kiedy agent jest przesadą.</p>
+<div class="goals"><span>mechanika tool calling</span><span>ReAct</span><span>agent od zera w TS</span><span>projektowanie narzędzi</span><span>wzorce workflow</span><span>multi-agent</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> Agent = <b>LLM + narzędzia + pętla</b>. Model nie wykonuje niczego sam — zwraca prośbę „wywołaj narzędzie X z argumentami Y”, Twój kod je wykonuje i odsyła wynik. Pętla trwa, dopóki model nie uzna zadania za skończone. Najwięcej jakości daje dobre zaprojektowanie narzędzi, a nie framework.</div>
+
+<h2>Spektrum autonomii</h2>
+<figure>
+<svg viewBox="0 0 680 140">
+<defs><linearGradient id="gr11" x1="0" x2="1"><stop offset="0" stop-color="var(--c3)"/><stop offset="1" stop-color="var(--c2)"/></linearGradient></defs>
+<rect x="20" y="55" width="640" height="14" rx="7" fill="url(#gr11)"/>
+<g font-size="12" text-anchor="middle">
+<circle cx="60" cy="62" r="9" fill="var(--surface)" stroke="var(--c3)" stroke-width="3"/><text x="60" y="40" font-weight="700" class="svg-text">Jedno wywołanie</text><text x="60" y="95" class="svg-muted">klasyfikacja,</text><text x="60" y="110" class="svg-muted">ekstrakcja</text>
+<circle cx="230" cy="62" r="9" fill="var(--surface)" stroke="var(--c3)" stroke-width="3"/><text x="230" y="40" font-weight="700" class="svg-text">Workflow</text><text x="230" y="95" class="svg-muted">stałe kroki w kodzie,</text><text x="230" y="110" class="svg-muted">LLM w każdym kroku</text>
+<circle cx="430" cy="62" r="9" fill="var(--surface)" stroke="var(--c2)" stroke-width="3"/><text x="430" y="40" font-weight="700" class="svg-text">Agent z narzędziami</text><text x="430" y="95" class="svg-muted">model decyduje o</text><text x="430" y="110" class="svg-muted">kolejnych krokach</text>
+<circle cx="610" cy="62" r="9" fill="var(--surface)" stroke="var(--c2)" stroke-width="3"/><text x="610" y="40" font-weight="700" class="svg-text">Multi-agent</text><text x="610" y="95" class="svg-muted">orkiestrator +</text><text x="610" y="110" class="svg-muted">podagenci</text>
+</g>
+<text x="20" y="132" font-size="11" class="svg-muted">← przewidywalność, niski koszt, łatwe testy</text><text x="660" y="132" font-size="11" text-anchor="end" class="svg-muted">elastyczność, wyższy koszt i ryzyko →</text>
+</svg>
+<figcaption>Zasada: wybierz najprostsze rozwiązanie, które działa. Jeśli znasz kroki z góry — workflow w kodzie. Agent ma sens, gdy kroków nie da się przewidzieć (debugowanie, research, obsługa nietypowych spraw).</figcaption>
+</figure>
+
+<h2>Mechanika tool calling</h2>
+<figure>
+<svg viewBox="0 0 680 330">
+<g font-size="12">
+<text x="110" y="20" text-anchor="middle" font-weight="700" class="svg-text">Twój kod</text><text x="560" y="20" text-anchor="middle" font-weight="700" class="svg-text">API modelu</text>
+<line x1="110" y1="30" x2="110" y2="320" stroke="var(--line)" stroke-dasharray="4 4"/><line x1="560" y1="30" x2="560" y2="320" stroke="var(--line)" stroke-dasharray="4 4"/>
+<g stroke="var(--c1)" stroke-width="2" fill="none"><path d="M115 55H555" marker-end="url(#a11)"/></g>
+<text x="335" y="48" text-anchor="middle" class="svg-text">① messages + tools: [get_order(order_id)]</text>
+<g stroke="var(--c2)" stroke-width="2" fill="none"><path d="M555 105H115" marker-end="url(#a11)"/></g>
+<text x="335" y="98" text-anchor="middle" class="svg-text">② stop_reason: "tool_use" · get_order({order_id:"481"})</text>
+<rect x="20" y="125" width="180" height="50" rx="8" fill="var(--warn-soft)" stroke="var(--c2)"/><text x="110" y="146" text-anchor="middle" class="svg-text" font-weight="700">③ wykonujesz funkcję</text><text x="110" y="163" text-anchor="middle" class="svg-muted" font-size="11">SELECT … FROM orders</text>
+<g stroke="var(--c1)" stroke-width="2" fill="none"><path d="M115 205H555" marker-end="url(#a11)"/></g>
+<text x="335" y="198" text-anchor="middle" class="svg-text">④ tool_result: {"status":"w drodze","eta":"jutro"}</text>
+<g stroke="var(--c3)" stroke-width="2" fill="none"><path d="M555 255H115" marker-end="url(#a11)"/></g>
+<text x="335" y="248" text-anchor="middle" class="svg-text">⑤ stop_reason: "end_turn" · „Paczka dotrze jutro.”</text>
+<text x="340" y="300" text-anchor="middle" class="svg-muted" font-size="11">Pętla ②–④ może powtarzać się wiele razy, a model może poprosić o kilka narzędzi naraz.</text>
+</g>
+<defs><marker id="a11" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+</svg>
+</figure>
+
+<h2>ReAct: myśl → działaj → obserwuj</h2>
+<p>ReAct (Reasoning + Acting) to wzorzec, w którym model przeplata rozumowanie z akcjami. Zobacz przebieg dla pytania o zamówienie:</p>
+<div class="widget" data-widget="stepper">
+<div class="w-title">Ślad agenta (trajektoria)</div>
+<div class="steps">
+<div class="step"><span class="lbl user">user</span>Zamówiłem kubki w poniedziałek (nr 481). Czy dotrą przed sobotą? Jeśli nie, chcę anulować.</div>
+<div class="step"><span class="lbl thought">myśl</span>Muszę sprawdzić status zamówienia 481 i przewidywaną datę dostawy.</div>
+<div class="step"><span class="lbl action">akcja</span><code>get_order({ order_id: "481" })</code></div>
+<div class="step"><span class="lbl obs">obserwacja</span><code>{ status: "oczekuje na towar", eta: "2026-10-20", cancellable: true }</code></div>
+<div class="step"><span class="lbl thought">myśl</span>Dostawa 20.10 to wtorek — po sobocie. Klient chce wtedy anulować. Anulowanie jest możliwe, ale to akcja nieodwracalna — potrzebuję potwierdzenia.</div>
+<div class="step"><span class="lbl action">akcja</span><code>cancel_order({ order_id: "481" })</code> → <i>system wymaga zgody użytkownika</i></div>
+<div class="step"><span class="lbl obs">obserwacja</span>Użytkownik zatwierdził. <code>{ cancelled: true, refund: "3-5 dni roboczych" }</code></div>
+<div class="step"><span class="lbl final">odpowiedź</span>Zamówienie dotarłoby dopiero we wtorek 20.10, więc je anulowałem. Zwrot pieniędzy pojawi się na koncie w ciągu 3–5 dni roboczych.</div>
+</div>
+<div class="controls"><button class="btn next">Następny krok</button><button class="btn secondary auto">▶ Auto</button><button class="btn secondary reset">Reset</button><span class="cnt stat"></span></div>
+</div>
+
+<h2>Agent od zera — kompletny kod</h2>
+<p>Bez frameworka, ~100 linii. Przepisz i uruchom — po tym ćwiczeniu każdy framework agentowy stanie się czytelny.</p>
+<code-block lang="typescript" file="src/agent/agent.ts">
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+const MODEL = "claude-sonnet-5-5";
+const MAX_STEPS = 10; // bezpiecznik przeciw nieskończonym pętlom
+
+// ---------- 1. Definicje narzędzi (to widzi model) ----------
+const tools: Anthropic.Tool[] = [
+  {
+    name: "get_order",
+    description: "Zwraca status, datę dostawy (eta) i czy można anulować zamówienie klienta. Użyj, gdy klient pyta o konkretne zamówienie.",
+    input_schema: {
+      type: "object",
+      properties: { order_id: { type: "string", description: "Numer zamówienia, np. '481'" } },
+      required: ["order_id"],
+    },
+  },
+  {
+    name: "search_faq",
+    description: "Przeszukuje bazę wiedzy sklepu (zwroty, reklamacje, wysyłka, płatności). Zwraca do 3 fragmentów.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string" } },
+      required: ["query"],
+    },
+  },
+  {
+    name: "calculate",
+    description: "Liczy wyrażenie arytmetyczne, np. '129.99 * 3 - 20'. Używaj zamiast liczenia w pamięci.",
+    input_schema: {
+      type: "object",
+      properties: { expression: { type: "string" } },
+      required: ["expression"],
+    },
+  },
+];
+
+// ---------- 2. Implementacje (to wykonuje Twój kod) ----------
+type Ctx = { userId: string };
+const impl: Record<string, (input: any, ctx: Ctx) => Promise<unknown>> = {
+  async get_order({ order_id }, ctx) {
+    const order = await db.orders.find(order_id);
+    if (!order || order.userId !== ctx.userId) {       // autoryzacja z sesji, nie od modelu!
+      throw new Error(`Nie znaleziono zamówienia ${order_id} dla tego klienta.`);
+    }
+    return { status: order.status, eta: order.eta, cancellable: order.cancellable };
+  },
+  async search_faq({ query }) {
+    return (await faqSearch(query, 3)).map(r => r.content); // zwięzły wynik, nie cały dokument
+  },
+  async calculate({ expression }) {
+    if (!/^[\d\s+\-*/().]+$/.test(expression)) throw new Error("Dozwolone tylko liczby i + - * / ( )");
+    return Function(`"use strict"; return (${expression})`)(); // bezpieczne dzięki whiteliście znaków
+  },
+};
+
+// ---------- 3. Pętla agenta ----------
+export async function runAgent(userMessage: string, ctx: Ctx) {
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: userMessage }];
+
+  for (let step = 0; step < MAX_STEPS; step++) {
+    const res = await client.messages.create({
+      model: MODEL,
+      max_tokens: 2000,
+      system: "Jesteś asystentem obsługi klienta sklepu. Korzystaj z narzędzi, zamiast zgadywać. Odpowiadaj krótko po polsku.",
+      tools,
+      messages,
+    });
+
+    // odpowiedź asystenta (z blokami tool_use) MUSI trafić do historii
+    messages.push({ role: "assistant", content: res.content });
+
+    if (res.stop_reason !== "tool_use") {
+      return res.content.filter(b => b.type === "text").map(b => b.text).join("");
+    }
+
+    // model może poprosić o kilka narzędzi naraz — wykonaj równolegle
+    const calls = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+    const results = await Promise.all(calls.map(async (call): Promise<Anthropic.ToolResultBlockParam> => {
+      try {
+        const fn = impl[call.name];
+        if (!fn) throw new Error(`Nieznane narzędzie: ${call.name}`);
+        const out = await fn(call.input, ctx);
+        log("tool", call.name, call.input, out);
+        return { type: "tool_result", tool_use_id: call.id, content: JSON.stringify(out) };
+      } catch (err) {
+        // błąd wraca do modelu — często sam się poprawi (inny argument, inne narzędzie)
+        return { type: "tool_result", tool_use_id: call.id, content: String(err), is_error: true };
+      }
+    }));
+
+    // wszystkie wyniki w JEDNEJ wiadomości user
+    messages.push({ role: "user", content: results });
+  }
+  return "Przepraszam, nie udało mi się dokończyć zadania. Przekazuję sprawę konsultantowi.";
+}
+
+declare const db: { orders: { find(id: string): Promise<any> } };
+declare function faqSearch(q: string, k: number): Promise<{ content: string }[]>;
+declare function log(...a: unknown[]): void;
+</code-block>
+<div class="callout"><span class="t">Na co zwrócić uwagę w kodzie</span>
+<ul style="margin:0">
+<li>Odpowiedź asystenta z blokami <code>tool_use</code> zawsze wraca do historii, a każdy <code>tool_use_id</code> musi dostać swój <code>tool_result</code>.</li>
+<li>Błędy narzędzi nie zabijają pętli — trafiają do modelu jako <code>is_error</code> z czytelnym komunikatem.</li>
+<li><code>MAX_STEPS</code> + limit tokenów/kosztu per zadanie = ochrona przed „nieskończonym” agentem.</li>
+<li>Tożsamość użytkownika pochodzi z <code>ctx</code> (sesja), nie z argumentów modelu.</li>
+</ul></div>
+<p>Odpowiednik w OpenAI wygląda bardzo podobnie: narzędzia definiujesz w polu <code>tools</code> (typ <code>function</code> z JSON Schema), model zwraca elementy <code>function_call</code>, a Ty odsyłasz <code>function_call_output</code> z tym samym <code>call_id</code>. Starsze Assistants API zostało wygaszone na rzecz Responses API.</p>
+
+<h2>Projektowanie narzędzi — najważniejsza umiejętność</h2>
+<p>Narzędzia to interfejs dla modelu. Pisz je tak, jak pisałbyś API dla nowego członka zespołu, który nie może zadać pytania.</p>
+<div class="vs">
+<div class="bad-ex">name: "query"
+description: "runs query"
+input: { q: string, t: number, f?: any }
+→ zwraca 5000 wierszy surowego JSON-a
+→ przy błędzie: "Error 500"</div>
+<div class="good-ex">name: "search_customer_orders"
+description: "Wyszukuje zamówienia zalogowanego klienta.
+  Użyj, gdy klient pyta o zamówienie bez numeru.
+  Zwraca max 10 najnowszych."
+input: { status?: "nowe"|"wysłane"|"dostarczone",
+         since?: "YYYY-MM-DD" }
+→ zwraca: id, data, kwota, status
+→ przy błędzie: "Nieprawidłowa data 'wczoraj'.
+  Użyj formatu YYYY-MM-DD."</div>
+</div>
+<ul class="checklist">
+<li><input type="checkbox" data-id="m11-1"><span><b>Nazwa i opis</b> mówią co, kiedy używać i czego nie robi. Opis to prompt.</span></li>
+<li><input type="checkbox" data-id="m11-2"><span><b>Mało, a dobrze</b>: 5 przemyślanych narzędzi bije 40 cienkich wrapperów na endpointy REST. Łącz typowe sekwencje w jedno narzędzie.</span></li>
+<li><input type="checkbox" data-id="m11-3"><span><b>Proste argumenty</b>: enumy zamiast dowolnych stringów, jasne formaty, sensowne wartości domyślne.</span></li>
+<li><input type="checkbox" data-id="m11-4"><span><b>Zwięzłe wyniki</b>: tylko pola potrzebne modelowi, paginacja, przycinanie długich tekstów (każdy token wyniku zajmuje kontekst).</span></li>
+<li><input type="checkbox" data-id="m11-5"><span><b>Pomocne błędy</b>: komunikat mówi, co poprawić.</span></li>
+<li><input type="checkbox" data-id="m11-6"><span><b>Bezpieczeństwo</b>: autoryzacja w kodzie, zatwierdzanie akcji nieodwracalnych, idempotencja (ponowienie nie płaci dwa razy).</span></li>
+</ul>
+
+<h2>Wzorce workflow (zanim sięgniesz po agenta)</h2>
+<div class="grid">
+<div class="card"><h4>⛓️ Prompt chaining</h4><p>Stała sekwencja kroków, z bramkami walidacji między nimi. <i>Np. konspekt → sprawdzenie → artykuł.</i></p></div>
+<div class="card"><h4>🔀 Routing</h4><p>Klasyfikacja wejścia i skierowanie do wyspecjalizowanego promptu/modelu. <i>Np. reklamacje vs pytania techniczne.</i></p></div>
+<div class="card"><h4>⚡ Parallelization</h4><p>Niezależne podzadania równolegle (sekcje dokumentu) albo głosowanie (3 oceny, większość wygrywa).</p></div>
+<div class="card"><h4>🎼 Orchestrator–workers</h4><p>Model planuje podzadania dynamicznie i rozdziela je do „pracowników”, potem scala wyniki.</p></div>
+<div class="card"><h4>🔁 Evaluator–optimizer</h4><p>Jeden model generuje, drugi ocenia według kryteriów i odsyła uwagi — pętla do skutku lub limitu.</p></div>
+<div class="card"><h4>🤖 Agent</h4><p>Pętla z narzędziami, model sam decyduje o krokach. Najbardziej elastyczny, najtrudniejszy do testowania.</p></div>
+</div>
+<code-block lang="typescript" file="src/agent/parallel.ts">
+// Parallelization: niezależne analizy jednocześnie, potem synteza
+const [security, perf, style] = await Promise.all([
+  review(diff, "Oceń wyłącznie bezpieczeństwo (injection, auth, sekrety)."),
+  review(diff, "Oceń wyłącznie wydajność (N+1, pętle, pamięć)."),
+  review(diff, "Oceń wyłącznie czytelność i nazewnictwo."),
+]);
+const summary = await review(
+  JSON.stringify({ security, perf, style }),
+  "Połącz trzy recenzje w jedną listę uwag, posortowaną od najważniejszej.",
+);
+declare function review(input: string, focus: string): Promise<string>;
+declare const diff: string;
+</code-block>
+
+<h2>Pamięć agenta</h2>
+<div class="table-wrap"><table>
+<tr><th>Rodzaj</th><th>Gdzie żyje</th><th>Przykład</th></tr>
+<tr><td>Krótkotrwała (robocza)</td><td>Okno kontekstowe — historia i wyniki narzędzi</td><td>Bieżąca rozmowa</td></tr>
+<tr><td>Scratchpad / notatki</td><td>Plik lub rekord, który agent sam czyta i aktualizuje</td><td>Lista TODO długiego zadania, postępy</td></tr>
+<tr><td>Długotrwała</td><td>Baza (często wektorowa) + narzędzia zapisu/odczytu</td><td>Preferencje użytkownika, fakty z poprzednich sesji</td></tr>
+<tr><td>Proceduralna</td><td>System prompt, pliki instrukcji, „skille”</td><td>Jak w tej firmie robi się code review</td></tr>
+</table></div>
+<p>Przy długich zadaniach stosuj <b>kompaktowanie</b>: gdy kontekst zbliża się do limitu, streść dotychczasowy przebieg (decyzje, stan, otwarte kwestie) i zacznij z czystą historią + streszczeniem.</p>
+
+<h2>Multi-agent</h2>
+<p>Orkiestrator rozbija zadanie i deleguje do podagentów z własnymi, czystymi kontekstami (np. każdy bada inny temat), a potem scala wyniki. Zalety: równoległość i izolacja kontekstu. Wady: wielokrotnie więcej tokenów, trudniejsze debugowanie, problemy z koordynacją. Sprawdza się w zadaniach szerokich i dających się podzielić (research), gorzej w zadaniach wymagających ciągłego współdzielenia stanu (wspólny kod).</p>
+
+<h2>Frameworki agentowe</h2>
+<div class="table-wrap"><table>
+<tr><th>Framework</th><th>Charakter</th></tr>
+<tr><td>Claude Agent SDK</td><td>Pętla agenta, narzędzia plikowe/terminal, MCP, kompaktowanie kontekstu — fundament Claude Code udostępniony do budowy własnych agentów</td></tr>
+<tr><td>OpenAI Agents SDK</td><td>Agenci, handoffy między agentami, guardrails, tracing</td></tr>
+<tr><td>LangGraph</td><td>Agenci jako graf stanów — dobra kontrola przepływu i trwałość stanu</td></tr>
+<tr><td>Vercel AI SDK / Mastra</td><td>TypeScript-first, integracja z Next.js, pętla narzędzi z limitem kroków</td></tr>
+<tr><td>CrewAI, AutoGen</td><td>Zespoły agentów z rolami</td></tr>
+</table></div>
+<p>Wybieraj framework po tym, jak napiszesz własną pętlę i będziesz wiedział, czego potrzebujesz. Zawsze upewnij się, że możesz zobaczyć <b>dokładny prompt i dokładne wywołania narzędzi</b>, które framework wysyła.</p>
+
+<h2>Testowanie agentów</h2>
+<ul>
+<li><b>Wynik końcowy</b>: czy zadanie zostało wykonane (stan w bazie, poprawna odpowiedź)?</li>
+<li><b>Trajektoria</b>: czy użył właściwych narzędzi, w rozsądnej liczbie kroków, bez zbędnych akcji?</li>
+<li><b>Odporność</b>: błędy narzędzi, puste wyniki, sprzeczne dane, próby injection w wynikach narzędzi.</li>
+<li><b>Koszt i czas</b>: średnia i 95. percentyl tokenów oraz kroków na zadanie.</li>
+</ul>
+
+<div class="quiz" data-answer="1"><div class="q">Agent w 15% przypadków wywołuje narzędzie <code>search</code> z argumentem w złym formacie i się zapętla. Co poprawi sytuację najbardziej?</div>
+<button class="opt">Zwiększenie MAX_STEPS do 50</button>
+<button class="opt">Precyzyjny opis i schemat argumentów (enum/format z przykładem) oraz komunikat błędu mówiący, jak poprawić wywołanie</button>
+<button class="opt">Usunięcie obsługi błędów, żeby agent szybciej kończył</button>
+<button class="opt">Zmiana nazwy narzędzia na krótszą</button>
+<div class="expl">Model korzysta z opisu narzędzia i komunikatów błędów jak z dokumentacji. Lepszy interfejs = mniej błędów, a pomocny błąd pozwala mu się samodzielnie poprawić.</div></div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Porozmawiaj z prawdziwym agentem, który ma narzędzia zapisu i trafia na ukrytą instrukcję w danych. Potem napisz jego serce — pętlę agenta — i walidację argumentów narzędzi.</p>
+<div data-lab="agent"></div>
+<div data-kata="m11-agent-loop"></div>
+<div data-kata="m11-schema"></div>
+</section>

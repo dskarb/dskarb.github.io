@@ -1,0 +1,45 @@
+<section class="module" id="lab" data-title="Laboratorium: jak zacząć">
+<div class="module-head"><div class="kicker">Warsztat praktyczny</div><h1>Laboratorium: nauka na realnych przypadkach</h1>
+<p>W każdym module znajdziesz ćwiczenia osadzone w konkretnych sytuacjach biznesowych: sklep internetowy, biuro rachunkowe, salon kosmetyczny, kawiarnia, przychodnia. Ta sekcja wyjaśnia, jak z nich korzystać, i pokazuje Twoje postępy.</p>
+<div class="goals"><span>30 zadań z kodem z automatycznymi testami</span><span>9 laboratoriów na prawdziwym modelu</span><span>działa w przeglądarce</span></div></div>
+
+<h2>Dwa rodzaje ćwiczeń</h2>
+<div class="vs">
+<div class="card" style="border-top:4px solid var(--c3)"><h4>Zadania z kodem</h4><p>Piszesz funkcję w JavaScript bezpośrednio na stronie, a testy sprawdzają ją od razu (kod działa w izolowanym Web Workerze z limitem czasu). To fragmenty prawdziwych systemów AI: parser strumienia SSE, retry z backoffem, walidator faktur, maskowanie PESEL-u, BM25, chunker, pętla agenta, serwer MCP, raport evali.</p><p><b>Nie potrzebujesz klucza API ani internetu.</b> Twój kod zapisuje się w przeglądarce.</p></div>
+<div class="card" style="border-top:4px solid var(--c2)"><h4>Laboratoria na żywym modelu</h4><p>Pracujesz z prawdziwym LLM-em: iterujesz prompt i mierzysz trafność, atakujesz własnego bota, budujesz RAG i sterujesz każdym etapem, obserwujesz agenta krok po kroku, kalibrujesz sędziego LLM.</p><p><b>Potrzebujesz dostawcy AI</b>: klucza API (Anthropic, OpenAI, OpenRouter…) albo darmowej Ollamy na swoim komputerze. Konfiguracja: przycisk <b>🔑 AI</b> u góry strony.</p></div>
+</div>
+
+<h2>Postępy</h2>
+<div data-lab="overview"></div>
+
+<h2>Konfiguracja dostawcy AI</h2>
+<div class="grid">
+<div class="card"><h4>Opcja A: klucz API (najlepsza jakość)</h4><ol style="padding-left:18px;margin:.3em 0;font-size:.92rem"><li>W konsoli dostawcy utwórz <b>osobny klucz tylko do nauki</b>.</li><li>Ustaw miesięczny limit wydatków, np. 5 $.</li><li>Kliknij <b>🔑 AI</b>, wybierz dostawcę, wklej klucz, wpisz ceny z cennika (wtedy zobaczysz koszty), kliknij „Test połączenia”.</li></ol><p class="muted-s">Do labów wystarczy tani model (np. Haiku albo mini). Pełne przejście wszystkich laboratoriów to zwykle kilkaset wywołań po kilkaset–kilka tysięcy tokenów, czyli przy tanim modelu koszt rzędu centów–pojedynczych dolarów. Policz to sam w labie „Wywołania API”.</p></div>
+<div class="card"><h4>Opcja B: Ollama (za darmo, lokalnie)</h4><p style="font-size:.92rem">Model działa na Twoim komputerze. Musisz pozwolić tej stronie łączyć się z Ollamą (CORS):</p><p class="muted-s">Jakość i obsługa narzędzi zależą od modelu. Do agenta wybierz model z obsługą tool callingu (np. <code>qwen3</code>), do labu z paragonem model z vision.</p></div>
+</div>
+<code-block lang="bash" file="Ollama — uruchomienie z dostępem dla tej strony">
+# modele: czat z narzędziami + embeddingi wielojęzyczne
+ollama pull qwen3:8b
+ollama pull bge-m3
+
+# Linux / macOS (terminal) — zatrzymaj wcześniej działającą aplikację Ollama
+OLLAMA_ORIGINS="https://dskarb.github.io" ollama serve
+
+# macOS, gdy używasz aplikacji Ollama z paska menu:
+launchctl setenv OLLAMA_ORIGINS "https://dskarb.github.io"   # potem uruchom ponownie aplikację
+
+# Windows (PowerShell), potem uruchom ponownie Ollamę:
+setx OLLAMA_ORIGINS "https://dskarb.github.io"
+</code-block>
+<p>W 🔑 AI wybierz „Ollama”, wpisz model (np. <code>qwen3:8b</code>) i model embeddingów (<code>bge-m3</code>). Przeglądarka może zapytać o zgodę na dostęp do urządzeń w sieci lokalnej — zezwól, bo strona łączy się z <code>localhost</code>.</p>
+
+<div class="callout warn"><span class="t">Dlaczego tu wolno wołać API z przeglądarki, a w produkcji nie</span>W module 04 jest zasada: klucz API nigdy nie trafia do frontendu. Laboratorium to wyjątek, który ma sens tylko dlatego, że to Twój klucz, w Twojej przeglądarce, na stronie do nauki. W aplikacji dla użytkowników każdy mógłby go odczytać z narzędzi deweloperskich. Anthropic wymaga nawet specjalnego nagłówka <code>anthropic-dangerous-direct-browser-access</code>, żeby takie wywołanie było świadomą decyzją.</div>
+
+<h2>Jak pracować z ćwiczeniami</h2>
+<div class="grid">
+<div class="card"><h4>1. Przewiduj</h4><p>Zanim uruchomisz lab, zapisz, jakiego wyniku się spodziewasz. Rozjazd między przewidywaniem a wynikiem to najlepszy moment nauki.</p></div>
+<div class="card"><h4>2. Zmieniaj jedną rzecz</h4><p>Jedna zmiana promptu lub parametru → jeden pomiar. Historia uruchomień w labach pomaga porównywać.</p></div>
+<div class="card"><h4>3. Przenieś do repo</h4><p>Rozwiązane zadania z kodem przepisz do swojego <code>ai-playground</code> w TypeScript (dodaj typy). Z kilku zrobisz bibliotekę: retry, parser SSE, walidator, BM25, RRF, chunker, pętla agenta.</p></div>
+<div class="card"><h4>4. Zrób z tego projekt</h4><p>Laby to prototypy projektów z modułu 17. Lab RAG + zadania z modułu 10 = szkielet Projektu 2; lab agenta + zadania z modułu 11 = Projekt 3.</p></div>
+</div>
+</section>

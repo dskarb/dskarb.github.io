@@ -1,0 +1,104 @@
+<section class="module" id="start" data-title="Start: jak korzystać">
+<div class="hero">
+  <div class="kicker" style="font-size:.8rem;font-weight:700;letter-spacing:.08em;color:var(--accent-ink)">KOMPENDIUM · NA PODSTAWIE ROADMAP.SH/AI-ENGINEER</div>
+  <h1>AI Engineer — od zera do samodzielnej pracy</h1>
+  <p>Wszystko, czego potrzebujesz, żeby budować produkcyjne aplikacje oparte o modele językowe: jak działają LLM-y, praca z API, prompt i context engineering, embeddingi, bazy wektorowe, RAG, agenci, MCP, multimodalność, fine-tuning, ewaluacja i utrzymanie na produkcji. Bez odsyłania do zewnętrznych tutoriali — teoria, diagramy, interaktywne demo i kod, który możesz od razu uruchomić.</p>
+  <p style="margin-top:10px"><span class="pill">18 modułów</span><span class="pill">interaktywne symulacje</span><span class="pill">kod TypeScript + Python</span><span class="pill">quizy</span><span class="pill">30 zadań z kodem z testami</span><span class="pill">9 laboratoriów na żywym modelu</span><span class="pill">projekty hands-on</span></p>
+</div>
+
+<h2>Kim jest AI Engineer — w jednym zdaniu</h2>
+<p><b>AI Engineer to inżynier oprogramowania, który używa gotowych (pre-trenowanych) modeli AI, by budować funkcje i produkty.</b> Nie trenuje modeli od zera (to robią ML Engineerowie i badacze) — zamiast tego dobiera model, projektuje kontekst i prompty, podłącza dane (RAG), narzędzia (agenci), mierzy jakość (ewaluacja) i dba o koszty, bezpieczeństwo i niezawodność na produkcji.</p>
+
+<div class="callout tip"><span class="t">Dobra wiadomość dla frontend / fullstack deva</span>
+Ponad połowa tej pracy to klasyczna inżynieria: API, asynchroniczność, streaming, typy, walidacja, cache, kolejki, UX stanów ładowania i błędów. Jeśli piszesz w TypeScript i React, masz już większość warsztatu. Kod w kompendium jest głównie w <b>TypeScript</b>, a w <b>Pythonie</b> tam, gdzie ekosystem (Hugging Face, fine-tuning) jest pythonowy.</div>
+
+<h2>Mapa drogi</h2>
+<figure>
+<svg viewBox="0 0 720 400" role="img" aria-label="Mapa modułów">
+  <defs><marker id="ar0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+  <g font-size="13" font-weight="600">
+    <text x="10" y="22" class="svg-muted" font-size="11">FUNDAMENTY</text>
+    <rect x="10" y="32" width="160" height="40" rx="10" fill="var(--accent-soft)" stroke="var(--c1)"/><text x="90" y="57" text-anchor="middle" class="svg-text">1. Rola AI Engineera</text>
+    <rect x="190" y="32" width="160" height="40" rx="10" fill="var(--accent-soft)" stroke="var(--c1)"/><text x="270" y="57" text-anchor="middle" class="svg-text">2. Jak działa LLM</text>
+    <rect x="370" y="32" width="160" height="40" rx="10" fill="var(--accent-soft)" stroke="var(--c1)"/><text x="450" y="57" text-anchor="middle" class="svg-text">3. Modele i dostawcy</text>
+    <rect x="550" y="32" width="160" height="40" rx="10" fill="var(--accent-soft)" stroke="var(--c1)"/><text x="630" y="57" text-anchor="middle" class="svg-text">4. API LLM</text>
+    <text x="10" y="112" class="svg-muted" font-size="11">STEROWANIE MODELEM</text>
+    <rect x="10" y="122" width="220" height="40" rx="10" class="svg-box" stroke="var(--c4)"/><text x="120" y="147" text-anchor="middle" class="svg-text">5. Prompt &amp; context eng.</text>
+    <rect x="250" y="122" width="220" height="40" rx="10" class="svg-box" stroke="var(--c4)"/><text x="360" y="147" text-anchor="middle" class="svg-text">6. Bezpieczeństwo i etyka</text>
+    <rect x="490" y="122" width="220" height="40" rx="10" class="svg-box" stroke="var(--c4)"/><text x="600" y="147" text-anchor="middle" class="svg-text">7. Open-source AI</text>
+    <text x="10" y="202" class="svg-muted" font-size="11">WIEDZA (DANE)</text>
+    <rect x="10" y="212" width="220" height="40" rx="10" class="svg-box" stroke="var(--c3)"/><text x="120" y="237" text-anchor="middle" class="svg-text">8. Embeddingi</text>
+    <rect x="250" y="212" width="220" height="40" rx="10" class="svg-box" stroke="var(--c3)"/><text x="360" y="237" text-anchor="middle" class="svg-text">9. Bazy wektorowe</text>
+    <rect x="490" y="212" width="220" height="40" rx="10" class="svg-box" stroke="var(--c3)"/><text x="600" y="237" text-anchor="middle" class="svg-text">10. RAG</text>
+    <text x="10" y="292" class="svg-muted" font-size="11">DZIAŁANIE I ZMYSŁY</text>
+    <rect x="10" y="302" width="160" height="40" rx="10" class="svg-box" stroke="var(--c2)"/><text x="90" y="327" text-anchor="middle" class="svg-text">11. Agenci</text>
+    <rect x="190" y="302" width="160" height="40" rx="10" class="svg-box" stroke="var(--c2)"/><text x="270" y="327" text-anchor="middle" class="svg-text">12. MCP</text>
+    <rect x="370" y="302" width="160" height="40" rx="10" class="svg-box" stroke="var(--c2)"/><text x="450" y="327" text-anchor="middle" class="svg-text">13. Multimodalność</text>
+    <rect x="550" y="302" width="160" height="40" rx="10" class="svg-box" stroke="var(--c2)"/><text x="630" y="327" text-anchor="middle" class="svg-text">14. Fine-tuning</text>
+    <rect x="10" y="352" width="700" height="40" rx="10" fill="var(--ok-soft)" stroke="var(--ok)"/><text x="360" y="377" text-anchor="middle" class="svg-text">15. Ewaluacja &amp; LLMOps · 16. Narzędzia · 17. Projekty i rozmowa rekrutacyjna</text>
+  </g>
+  <g class="svg-line" stroke-width="1.5" marker-end="url(#ar0)">
+    <path d="M170 52H188"/><path d="M350 52H368"/><path d="M530 52H548"/>
+    <path d="M360 72V120" class="anim-dash"/><path d="M360 162V210" class="anim-dash"/><path d="M360 252V300" class="anim-dash"/>
+  </g>
+</svg>
+<figcaption>Kolejność ma znaczenie: każdy blok korzysta z poprzednich. RAG potrzebuje embeddingów, agenci potrzebują tool callingu z API, a ewaluacja spina wszystko na końcu.</figcaption>
+</figure>
+
+<h2>Moduły</h2>
+<div class="mod-grid">
+  <a href="#lab" style="border-color:var(--c2)"><span class="n">🧪</span><br>Laboratorium<small>jak zacząć · postępy · klucz API</small></a>
+  <a href="#m01"><span class="n">01</span><br>Kim jest AI Engineer<small>rola, kompetencje, stack</small></a>
+  <a href="#m02"><span class="n">02</span><br>Jak działają LLM<small>tokeny, transformer, sampling</small></a>
+  <a href="#m03"><span class="n">03</span><br>Modele i dostawcy<small>wybór modelu, trade-offy</small></a>
+  <a href="#m04"><span class="n">04</span><br>Praca z API LLM<small>streaming, structured output, koszty</small></a>
+  <a href="#m05"><span class="n">05</span><br>Prompt &amp; context engineering<small>techniki, szablony, kontekst</small></a>
+  <a href="#m06"><span class="n">06</span><br>Bezpieczeństwo i etyka<small>prompt injection, guardrails</small></a>
+  <a href="#m07"><span class="n">07</span><br>Open-source AI<small>Hugging Face, Ollama, kwantyzacja</small></a>
+  <a href="#m08"><span class="n">08</span><br>Embeddingi<small>wektory, podobieństwo</small></a>
+  <a href="#m09"><span class="n">09</span><br>Bazy wektorowe<small>HNSW, pgvector, filtrowanie</small></a>
+  <a href="#m10"><span class="n">10</span><br>RAG<small>chunking, retrieval, reranking</small></a>
+  <a href="#m11"><span class="n">11</span><br>Agenci AI<small>tool calling, ReAct, pętla</small></a>
+  <a href="#m12"><span class="n">12</span><br>Model Context Protocol<small>serwery, klienci, narzędzia</small></a>
+  <a href="#m13"><span class="n">13</span><br>Multimodalność<small>obraz, audio, wideo</small></a>
+  <a href="#m14"><span class="n">14</span><br>Fine-tuning<small>SFT, LoRA, kiedy warto</small></a>
+  <a href="#m15"><span class="n">15</span><br>Ewaluacja &amp; LLMOps<small>evals, tracing, koszty, deploy</small></a>
+  <a href="#m16"><span class="n">16</span><br>Narzędzia deweloperskie<small>AI w codziennym kodowaniu</small></a>
+  <a href="#m17"><span class="n">17</span><br>Projekty i kariera<small>portfolio, plan, rekrutacja</small></a>
+  <a href="#m18"><span class="n">18</span><br>Glosariusz i ściąga<small>wszystkie pojęcia</small></a>
+</div>
+
+<h2>Jak się uczyć z tego kompendium</h2>
+<div class="grid">
+  <div class="card"><h4>① Czytaj z klawiaturą</h4><p>Każdy moduł ma kod. Przepisuj go (nie kopiuj) do własnego repo <code>ai-playground</code>. Pisanie rękami utrwala API w pamięci.</p></div>
+  <div class="card"><h4>② Bawić się demo</h4><p>Elementy oznaczone <span class="pill" style="background:var(--accent);color:#fff">▶</span> są interaktywne. Zmieniaj parametry i przewiduj wynik <i>zanim</i> go zobaczysz.</p></div>
+  <div class="card"><h4>③ Quiz na końcu sekcji</h4><p>Quizy sprawdzają zrozumienie, nie pamięć. Jeśli się pomylisz, przeczytaj wyjaśnienie i wróć do sekcji.</p></div>
+  <div class="card"><h4>④ Ćwiczenia w każdym module</h4><p>Na końcu modułów: zadania z kodem sprawdzane testami (bez klucza) i laboratoria na prawdziwym modelu. Start: <a href="#lab">Laboratorium</a>.</p></div>
+  <div class="card"><h4>⑤ Projekt co 2–3 moduły</h4><p>Moduł 17 zawiera 6 projektów z wymaganiami. Bez projektów nie ma hands-on doświadczenia — to one trafią do CV.</p></div>
+</div>
+
+<div class="callout warn"><span class="t">O aktualności</span>
+Fundamenty (tokeny, embeddingi, RAG, agenci, ewaluacja) są stabilne od lat. Szybko zmieniają się natomiast <b>nazwy modeli, ceny i limity</b>. Wszędzie, gdzie podaję konkretne modele lub ceny, traktuj je jako przykład z października 2026 i sprawdzaj w panelu dostawcy przed decyzją produkcyjną. W kodzie nazwy modeli są w stałych, żeby łatwo je podmienić.</div>
+
+<h3>Przygotowanie środowiska (raz, 10 minut)</h3>
+<code-block lang="bash" file="terminal">
+# Node 22+ i Python 3.11+
+mkdir ai-playground && cd ai-playground
+npm init -y
+npm i openai @anthropic-ai/sdk zod dotenv
+npm i -D typescript tsx @types/node
+npx tsc --init
+
+# Python (wirtualne środowisko)
+python3 -m venv .venv && source .venv/bin/activate
+pip install openai anthropic sentence-transformers chromadb transformers numpy
+
+# klucze trzymaj w .env (i dodaj .env do .gitignore!)
+echo "OPENAI_API_KEY=sk-..." >> .env
+echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
+
+# uruchamianie plików TS bez kompilacji:
+npx tsx src/01-hello.ts
+</code-block>
+<p>Postęp (ukończone moduły, zaznaczone checklisty) zapisuje się w przeglądarce. Motyw jasny/ciemny przełączysz przyciskiem 🌓 w prawym górnym rogu. Plik działa w pełni offline.</p>
+</section>

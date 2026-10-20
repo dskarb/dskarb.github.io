@@ -1,0 +1,153 @@
+<section class="module" id="m08" data-num="08" data-title="Embeddingi">
+<div class="module-head"><div class="kicker">Moduł 08 · Wiedza</div><h1>Embeddingi — znaczenie zapisane w liczbach</h1>
+<p>Fundament wyszukiwania semantycznego, RAG, rekomendacji i klasyfikacji. Zrozumiesz intuicję, metryki podobieństwa i napiszesz wyszukiwarkę od zera.</p>
+<div class="goals"><span>czym jest wektor znaczenia</span><span>cosine similarity</span><span>wybór modelu</span><span>wyszukiwarka semantyczna od zera</span></div></div>
+
+<div class="tldr"><b>TL;DR</b> Model embeddingów zamienia tekst (lub obraz) na wektor liczb o stałej długości, np. 1536. Teksty o podobnym znaczeniu dają wektory bliskie sobie — nawet jeśli nie mają wspólnych słów. „Jak zresetować hasło?” i „Nie pamiętam hasła do konta” będą obok siebie.</div>
+
+<h2>Intuicja: mapa znaczeń</h2>
+<p>Wyobraź sobie mapę, na której każde słowo ma współrzędne. Prawdziwe embeddingi mają setki lub tysiące wymiarów, ale zasada jest ta sama co w 2D. <b>Kliknij dowolny punkt</b>, aby uczynić go zapytaniem — zobaczysz najbliższych sąsiadów według cosine similarity.</p>
+<div class="widget" data-widget="embed2d"><div class="w-title">Przestrzeń embeddingów 2D</div><canvas></canvas><div class="out"></div></div>
+<p>Zwróć uwagę na „Apple (firma)” — leży pomiędzy owocami a technologią. Prawdziwe modele embeddingów korzystają z kontekstu całego zdania, więc „Apple wypuściło nowy telefon” trafi bliżej technologii, a „upiekłam szarlotkę z apple” bliżej owoców.</p>
+<div class="callout analogy"><span class="t">Słynny przykład</span>W klasycznych embeddingach słów działała arytmetyka znaczeń: <code>wektor(„król”) − wektor(„mężczyzna”) + wektor(„kobieta”) ≈ wektor(„królowa”)</code>. Kierunki w przestrzeni kodują relacje (płeć, liczba mnoga, czas). Współczesne modele zdań są bogatsze, ale idea „znaczenie = położenie” zostaje.</div>
+
+<h2>Miary podobieństwa</h2>
+<div class="formula">cosine(A, B) = (A · B) / (‖A‖ × ‖B‖)        zakres: −1 … 1  (1 = ten sam kierunek)<br>dot(A, B) = Σ aᵢ·bᵢ                          dla wektorów znormalizowanych = cosine<br>euclidean(A, B) = √Σ (aᵢ − bᵢ)²             0 = identyczne</div>
+<div class="widget" data-widget="cosine">
+<div class="w-title">Kalkulator podobieństwa</div>
+<div class="row"><div><label>Wektor A</label><input type="text" name="a" value="0.9, 0.1, 0.3"></div><div><label>Wektor B</label><input type="text" name="b" value="0.8, 0.2, 0.35"></div></div>
+<div class="out"></div>
+<p style="font-size:.8rem;color:var(--muted);margin:.5em 0 0">Spróbuj: B = 1.8, 0.2, 0.6 (ten sam kierunek, dłuższy wektor) — cosine = 1, ale odległość euklidesowa duża. Cosine patrzy tylko na kierunek.</p>
+</div>
+<div class="callout tip"><span class="t">W praktyce</span>Większość modeli embeddingów zwraca wektory znormalizowane (długość 1). Wtedy cosine = iloczyn skalarny, a ranking według euklidesa jest identyczny. Używaj metryki zalecanej w dokumentacji modelu — zwykle cosine.</div>
+
+<h2>Do czego służą embeddingi</h2>
+<div class="grid">
+<div class="card"><h4>🔎 Wyszukiwanie semantyczne</h4><p>Szukanie po znaczeniu, nie słowach kluczowych. Serce RAG.</p></div>
+<div class="card"><h4>🎯 Rekomendacje</h4><p>„Podobne produkty/artykuły”: najbliżsi sąsiedzi tego, co użytkownik oglądał.</p></div>
+<div class="card"><h4>🏷️ Klasyfikacja</h4><p>Najbliższy centroid kategorii albo lekki klasyfikator na wektorach — tanio i szybko.</p></div>
+<div class="card"><h4>🧩 Klastrowanie</h4><p>Grupowanie tysięcy opinii lub zgłoszeń w tematy (k-means, HDBSCAN).</p></div>
+<div class="card"><h4>🚨 Wykrywanie anomalii</h4><p>Tekst daleko od wszystkich znanych klastrów = nietypowy (oszustwo, nowy problem).</p></div>
+<div class="card"><h4>♻️ Deduplikacja</h4><p>Wykrywanie niemal identycznych dokumentów lub pytań (cosine &gt; próg).</p></div>
+</div>
+
+<h2>Wyszukiwarka semantyczna od zera</h2>
+<code-block lang="typescript" file="src/semantic-search.ts">
+import OpenAI from "openai";
+const openai = new OpenAI();
+const EMBED_MODEL = "text-embedding-3-small"; // 1536 wymiarów, tani
+
+async function embed(texts: string[]): Promise<number[][]> {
+  // API przyjmuje wiele tekstów naraz — zawsze batchuj
+  const res = await openai.embeddings.create({ model: EMBED_MODEL, input: texts });
+  return res.data.map(d => d.embedding);
+}
+
+const dot = (a: number[], b: number[]) => a.reduce((s, x, i) => s + x * b[i], 0);
+// wektory OpenAI są znormalizowane → dot = cosine
+
+const docs = [
+  "Aby zresetować hasło, kliknij 'Nie pamiętam hasła' na stronie logowania.",
+  "Zwrot towaru jest możliwy w ciągu 14 dni od otrzymania przesyłki.",
+  "Wysyłka kurierem trwa zazwyczaj 1–2 dni robocze.",
+  "Fakturę VAT znajdziesz w zakładce Moje zamówienia.",
+  "Płatność BLIK jest księgowana natychmiast.",
+];
+
+// Indeksowanie — raz (w prawdziwym systemie: zapis do bazy wektorowej)
+const docVectors = await embed(docs);
+
+export async function search(query: string, k = 2) {
+  const [q] = await embed([query]);
+  return docs
+    .map((text, i) => ({ text, score: dot(q, docVectors[i]) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k);
+}
+
+console.log(await search("nie mogę się zalogować, zapomniałem hasła"));
+console.log(await search("ile czeka się na paczkę?"));
+console.log(await search("chcę oddać buty"));
+</code-block>
+<p>Zauważ: zapytanie „chcę oddać buty” nie ma żadnego wspólnego słowa z „Zwrot towaru jest możliwy…”, a i tak go znajdzie. Tego nie zrobi klasyczne wyszukiwanie po słowach.</p>
+
+<h3>To samo w Pythonie, lokalnie i za darmo</h3>
+<code-block lang="python" file="semantic_search.py">
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+# Model wielojęzyczny — dobrze radzi sobie z polskim
+model = SentenceTransformer("intfloat/multilingual-e5-base")
+
+docs = ["Zwrot towaru w ciągu 14 dni.", "Wysyłka trwa 1-2 dni.", "Reset hasła na stronie logowania."]
+# modele E5 wymagają prefiksów: "passage: " dla dokumentów i "query: " dla zapytań
+doc_emb = model.encode([f"passage: {d}" for d in docs], normalize_embeddings=True)
+q_emb = model.encode(["query: jak oddać zamówienie?"], normalize_embeddings=True)
+
+scores = (q_emb @ doc_emb.T)[0]          # iloczyn macierzowy = cosine dla wszystkich naraz
+for i in np.argsort(-scores):
+    print(f"{scores[i]:.3f}  {docs[i]}")
+</code-block>
+
+<h2>Wybór modelu embeddingów</h2>
+<div class="table-wrap"><table>
+<tr><th>Model (przykłady)</th><th>Typ</th><th>Wymiary</th><th>Uwagi</th></tr>
+<tr><td>OpenAI text-embedding-3-small / -large</td><td>API</td><td>1536 / 3072 (skracalne)</td><td>Parametr <code>dimensions</code> pozwala skrócić wektor</td></tr>
+<tr><td>Cohere embed (multilingual)</td><td>API</td><td>zależnie od wersji</td><td>Silne wielojęzyczne, osobne typy wejścia: query/document</td></tr>
+<tr><td>Voyage</td><td>API</td><td>zależnie od wersji</td><td>Warianty domenowe (kod, prawo, finanse)</td></tr>
+<tr><td>multilingual-e5, bge-m3</td><td>open-source</td><td>768–1024</td><td>Dobre dla polskiego, darmowe, lokalne</td></tr>
+<tr><td>all-MiniLM-L6-v2</td><td>open-source</td><td>384</td><td>Mały i szybki, ale głównie angielski</td></tr>
+</table></div>
+<ul>
+<li><b>Ranking MTEB</b> (Massive Text Embedding Benchmark) porównuje modele na wielu zadaniach — istnieje też wariant z polskimi zadaniami. Jak zawsze: ostatecznie testuj na własnych danych.</li>
+<li><b>Więcej wymiarów</b> = zwykle lepsza jakość, ale więcej pamięci i wolniejsze wyszukiwanie. 1 mln wektorów × 1536 float32 ≈ 6 GB.</li>
+<li><b>Matryoshka embeddings</b>: część modeli jest trenowana tak, że pierwsze N wymiarów samo w sobie jest dobrym embeddingiem. Możesz przyciąć 3072 → 512 i stracić niewiele jakości.</li>
+<li><b>Modele asymetryczne</b> rozróżniają zapytanie (krótkie) i dokument (długi) — prefiksy lub parametr typu wejścia. Pominięcie tego obniża jakość.</li>
+</ul>
+
+<div class="callout bad"><span class="t">Złota zasada</span>Zapytania i dokumenty muszą być zembeddowane <b>tym samym modelem</b> (i tą samą wersją). Wektory z różnych modeli żyją w różnych przestrzeniach — porównywanie ich nie ma sensu. Zmiana modelu = ponowne zembeddowanie całej bazy, więc zapisuj nazwę modelu przy każdym wektorze.</div>
+
+<h2>Klasyfikacja embeddingami (bez LLM)</h2>
+<code-block lang="typescript" file="src/embed-classify.ts">
+// Kilka przykładów na kategorię → średni wektor (centroid) → najbliższy centroid wygrywa.
+// Koszt: ułamek centa za tysiące klasyfikacji, latencja kilkadziesiąt ms.
+const labeled: Record<string, string[]> = {
+  dostawa: ["gdzie jest moja paczka", "kurier nie przyjechał", "kiedy dostanę zamówienie"],
+  zwrot: ["chcę oddać produkt", "jak zwrócić towar", "zwrot pieniędzy za buty"],
+  platnosc: ["dwa razy pobrało mi pieniądze", "nie przeszła płatność BLIK", "faktura się nie zgadza"],
+};
+
+const centroids: Record<string, number[]> = {};
+for (const [label, examples] of Object.entries(labeled)) {
+  const vecs = await embed(examples);
+  const mean = vecs[0].map((_, d) => vecs.reduce((s, v) => s + v[d], 0) / vecs.length);
+  const norm = Math.hypot(...mean);
+  centroids[label] = mean.map(x => x / norm); // normalizacja po uśrednieniu
+}
+
+export async function classify(text: string) {
+  const [v] = await embed([text]);
+  const scored = Object.entries(centroids).map(([label, c]) => ({ label, score: dot(v, c) }));
+  scored.sort((a, b) => b.score - a.score);
+  // niska pewność → przekaż do LLM lub człowieka
+  return scored[0].score < 0.3 ? { label: "niepewne", scored } : { label: scored[0].label, scored };
+}
+declare function embed(t: string[]): Promise<number[][]>;
+declare function dot(a: number[], b: number[]): number;
+</code-block>
+<p>Próg 0.3 jest przykładowy — rozkład wartości cosine zależy od modelu. Ustal próg na zbiorze walidacyjnym.</p>
+
+<div class="quiz" data-answer="1"><div class="q">Zaindeksowałeś 100 tys. dokumentów modelem A. Teraz chcesz embeddować zapytania nowszym, lepszym modelem B. Co się stanie?</div>
+<button class="opt">Wyniki będą lepsze, bo model B jest lepszy</button>
+<button class="opt">Wyniki będą bezsensowne — wektory z różnych modeli nie są porównywalne; trzeba przeindeksować dokumenty modelem B</button>
+<button class="opt">Zadziała, o ile oba modele mają tę samą liczbę wymiarów</button>
+<button class="opt">Wystarczy znormalizować wektory</button>
+<div class="expl">Nawet przy tej samej liczbie wymiarów przestrzenie są różne. Zmiana modelu embeddingów zawsze oznacza re-indeksację.</div></div>
+
+<h2 class="practice">🧪 Ćwiczenia praktyczne</h2>
+<p>Uruchom prawdziwy wielojęzyczny model embeddingów w przeglądarce i zmierz, ile daje względem wyszukiwania po słowach. Potem trzy zastosowania embeddingów bez LLM: wyszukiwanie, deduplikacja i klasyfikacja.</p>
+<div data-lab="embed"></div>
+<div data-kata="m08-topk"></div>
+<div data-kata="m08-dedupe"></div>
+<div data-kata="m08-centroid"></div>
+</section>
